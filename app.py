@@ -23,7 +23,7 @@ if os.path.exists("logo.jpg"):
 # ==========================================
 # MENÚ LATERAL
 # ==========================================
-st.sidebar.title("🛠️ Herramientas NEXA")
+st.sidebar.title("🛠️ Automatizaciones NEXA")
 st.sidebar.markdown("Elige el proceso que necesitas:")
 opcion = st.sidebar.radio(
     "",
