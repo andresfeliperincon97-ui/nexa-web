@@ -12,16 +12,12 @@ from io import BytesIO
 st.set_page_config(page_title="NEXA - Transformación de Procesos", page_icon="⚙️", layout="wide")
 
 # ==========================================
-# HEADER PRINCIPAL (LOGO CENTRADO Y GRANDE)
+# HEADER PRINCIPAL (LOGO)
 # ==========================================
-# Buscador inteligente de logos (A prueba de extensiones)
 ruta_logo = None
-if os.path.exists("logo.png"):
-    ruta_logo = "logo.png"
-elif os.path.exists("logo.jpg"):
-    ruta_logo = "logo.jpg"
-elif os.path.exists("logo.jpeg"):
-    ruta_logo = "logo.jpeg"
+if os.path.exists("logo.png"): ruta_logo = "logo.png"
+elif os.path.exists("logo.jpg"): ruta_logo = "logo.jpg"
+elif os.path.exists("logo.jpeg"): ruta_logo = "logo.jpeg"
 
 if ruta_logo:
     try:
@@ -31,6 +27,37 @@ if ruta_logo:
         st.markdown("---")
     except Exception:
         pass 
+
+# ==========================================
+# SISTEMA DE SEGURIDAD (EL CADENERO)
+# ==========================================
+# Si el usuario no está validado, le mostramos la pantalla de inicio de sesión
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+if not st.session_state.autenticado:
+    st.markdown("<h3 style='text-align: center;'>🔒 Acceso Restringido</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Por favor, ingresa tu código de acceso para entrar a la plataforma.</p>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        password = st.text_input("Contraseña / ID de acceso:", type="password")
+        if st.button("Entrar", type="primary", use_container_width=True):
+            try:
+                # Extraemos todas las contraseñas válidas de tu bóveda secreta
+                claves_validas = list(st.secrets["accesos"].values())
+                
+                if password in claves_validas:
+                    st.session_state.autenticado = True
+                    st.rerun() # Recarga la página ya estando adentro
+                else:
+                    st.error("❌ Código incorrecto o inactivo. Intenta de nuevo.")
+            except Exception:
+                st.warning("⚠️ La bóveda de contraseñas no ha sido configurada correctamente en Streamlit.")
+    
+    # Detenemos todo el código aquí para que no se muestre nada más hasta que pongan la clave
+    st.stop()
+
 
 # ==========================================
 # MENÚ LATERAL
