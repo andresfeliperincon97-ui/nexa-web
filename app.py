@@ -3,7 +3,7 @@ import pandas as pd
 import zipfile
 import os
 import tempfile
-from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from io import BytesIO
 
 # ==========================================
@@ -178,15 +178,14 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
     archivos_subidos = st.file_uploader("📄 1. Sube todos los PDFs que quieras unir (Selecciona varios a la vez)", type=["pdf"], accept_multiple_files=True)
     
     if archivos_subidos:
-        # Extraer los nombres de los archivos subidos
         nombres_archivos = [archivo.name for archivo in archivos_subidos]
         diccionario_archivos = {archivo.name: archivo for archivo in archivos_subidos}
         
         st.markdown("### 2. Selecciona el orden")
         st.info("💡 Haz clic en la caja de abajo y selecciona los archivos **en el orden en el que quieres que se unan** (El primero que elijas quedará de página 1). Puedes borrar con la 'X' y volver a seleccionar.")
         
-        # Aquí es donde reemplazamos los "cuadritos" de iLovePDF por un selector inteligente
-        orden_seleccionado = st.multiselect("Orden final de los documentos:", nombres_archivos, default=nombres_archivos)
+        # Dejamos la caja vacía por defecto para que sea más fácil armar el orden
+        orden_seleccionado = st.multiselect("Orden final de los documentos:", nombres_archivos)
         
         st.markdown("### 3. Nombre del archivo final")
         nombre_final = st.text_input("¿Cómo quieres que se llame el PDF unificado?", "Documento_Unificado.pdf")
@@ -199,23 +198,25 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
             if not orden_seleccionado:
                 st.warning("⚠️ Debes seleccionar al menos un documento para unir.")
             else:
-                with st.spinner("Uniendo documentos..."):
+                with st.spinner("Fusionando documentos conservando la calidad original..."):
                     try:
-                        escritor_pdf = PdfWriter()
+                        # Usamos PdfMerger (El pegante industrial) en lugar de PdfWriter
+                        fusionador = PdfMerger()
                         
-                        # Unir en el orden exacto que seleccionó el usuario
                         for nombre in orden_seleccionado:
                             archivo_actual = diccionario_archivos[nombre]
-                            lector_pdf = PdfReader(archivo_actual)
-                            for pagina in lector_pdf.pages:
-                                escritor_pdf.add_page(pagina)
+                            # TRUCO VITAL: Regresar el cursor de lectura a cero antes de leer
+                            archivo_actual.seek(0)
+                            fusionador.append(archivo_actual)
                         
-                        # Guardar el PDF resultante en la memoria temporal
                         buffer_salida = BytesIO()
-                        escritor_pdf.write(buffer_salida)
+                        fusionador.write(buffer_salida)
+                        fusionador.close()
+                        
+                        # Preparar el buffer para descarga
                         buffer_salida.seek(0)
                         
-                        st.success(f"✅ ¡Documento '{nombre_final}' creado con éxito!")
+                        st.success(f"✅ ¡Documento '{nombre_final}' creado con éxito y calidad original!")
                         
                         st.download_button(
                             label="⬇️ Descargar PDF Unificado",
