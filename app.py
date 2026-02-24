@@ -14,7 +14,12 @@ st.set_page_config(page_title="NEXA - Transformación de Procesos", page_icon="�
 # ==========================================
 # MENÚ LATERAL (LA NAVAJA SUIZA)
 # ==========================================
-st.sidebar.title("🛠️ Herramientas NEXA")
+# Intentar cargar el logo si existe
+if os.path.exists("logo.jpg"):
+    st.sidebar.image("logo.jpg", use_container_width=True)
+else:
+    st.sidebar.title("🛠️ NEXA")
+
 st.sidebar.markdown("Elige el proceso que necesitas:")
 opcion = st.sidebar.radio(
     "",
@@ -28,7 +33,16 @@ st.sidebar.info("🔒 **100% Privado:** Los documentos procesados aquí no se gu
 # HERRAMIENTA 1: MOTOR MASIVO
 # ==========================================
 if opcion == "1️⃣ Motor Masivo (Excel + ZIP)":
-    st.title("🚀 NEXA: Motor Masivo")
+    
+    if os.path.exists("logo.jpg"):
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image("logo.jpg", width=120)
+        with col2:
+            st.title("Motor Masivo")
+    else:
+        st.title("🚀 NEXA: Motor Masivo")
+        
     st.markdown("Ensambla cientos de expedientes al mismo tiempo usando tu **Plantilla de Excel** y archivos **ZIP**.")
 
     st.markdown("---")
@@ -171,7 +185,16 @@ if opcion == "1️⃣ Motor Masivo (Excel + ZIP)":
 # HERRAMIENTA 2: UNIÓN RÁPIDA (Estilo iLovePDF)
 # ==========================================
 elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
-    st.title("🔗 Unión Rápida de PDFs")
+    
+    if os.path.exists("logo.jpg"):
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image("logo.jpg", width=120)
+        with col2:
+            st.title("Unión Rápida de PDFs")
+    else:
+        st.title("🔗 Unión Rápida de PDFs")
+        
     st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, eligiendo el orden exacto.")
 
     st.markdown("---")
@@ -184,7 +207,6 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
         st.markdown("### 2. Selecciona el orden")
         st.info("💡 Haz clic en la caja de abajo y selecciona los archivos **en el orden en el que quieres que se unan** (El primero que elijas quedará de página 1). Puedes borrar con la 'X' y volver a seleccionar.")
         
-        # Dejamos la caja vacía por defecto para que sea más fácil armar el orden
         orden_seleccionado = st.multiselect("Orden final de los documentos:", nombres_archivos)
         
         st.markdown("### 3. Nombre del archivo final")
@@ -200,12 +222,10 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
             else:
                 with st.spinner("Fusionando documentos conservando la calidad original..."):
                     try:
-                        # Usamos PdfMerger (El pegante industrial) en lugar de PdfWriter
                         fusionador = PdfMerger()
                         
                         for nombre in orden_seleccionado:
                             archivo_actual = diccionario_archivos[nombre]
-                            # TRUCO VITAL: Regresar el cursor de lectura a cero antes de leer
                             archivo_actual.seek(0)
                             fusionador.append(archivo_actual)
                         
@@ -213,7 +233,6 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
                         fusionador.write(buffer_salida)
                         fusionador.close()
                         
-                        # Preparar el buffer para descarga
                         buffer_salida.seek(0)
                         
                         st.success(f"✅ ¡Documento '{nombre_final}' creado con éxito y calidad original!")
