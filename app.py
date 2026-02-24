@@ -14,11 +14,17 @@ st.set_page_config(page_title="NEXA - Transformación de Procesos", page_icon="�
 # ==========================================
 # HEADER PRINCIPAL (LOGO CENTRADO Y GRANDE)
 # ==========================================
-# Forzamos la aparición del logo sin condiciones
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.image("logo.jpg", use_container_width=True)
-st.markdown("---")
+# Buscamos el logo con la ruta absoluta y un escudo anti-errores
+ruta_logo = os.path.join(os.path.dirname(__file__), "logo.jpg")
+
+try:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image(ruta_logo, use_container_width=True)
+    st.markdown("---")
+except Exception:
+    # Si Streamlit aún no descarga la imagen, simplemente no la muestra y no da error
+    pass 
 
 # ==========================================
 # MENÚ LATERAL
