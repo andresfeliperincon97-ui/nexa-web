@@ -12,38 +12,33 @@ from io import BytesIO
 st.set_page_config(page_title="NEXA - Transformación de Procesos", page_icon="⚙️", layout="wide")
 
 # ==========================================
-# MENÚ LATERAL (LA NAVAJA SUIZA)
+# HEADER PRINCIPAL (LOGO CENTRADO Y GRANDE)
 # ==========================================
-# Intentar cargar el logo si existe
 if os.path.exists("logo.jpg"):
-    st.sidebar.image("logo.jpg", use_container_width=True)
-else:
-    st.sidebar.title("🛠️ NEXA")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.image("logo.jpg", use_container_width=True)
+    st.markdown("---")
 
+# ==========================================
+# MENÚ LATERAL
+# ==========================================
+st.sidebar.title("🛠️ Herramientas NEXA")
 st.sidebar.markdown("Elige el proceso que necesitas:")
 opcion = st.sidebar.radio(
     "",
-    ("1️⃣ Motor Masivo (Excel + ZIP)", "2️⃣ Unión Rápida (Múltiples PDFs)")
+    ("🗂️ Nexificar PDFs Masivamente", "📄🔗📄 Nexificar PDFs")
 )
 
 st.sidebar.markdown("---")
 st.sidebar.info("🔒 **100% Privado:** Los documentos procesados aquí no se guardan en ningún servidor externo.")
 
 # ==========================================
-# HERRAMIENTA 1: MOTOR MASIVO
+# HERRAMIENTA 1: NEXIFICAR MASIVAMENTE
 # ==========================================
-if opcion == "1️⃣ Motor Masivo (Excel + ZIP)":
-    
-    if os.path.exists("logo.jpg"):
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            st.image("logo.jpg", width=120)
-        with col2:
-            st.title("Motor Masivo")
-    else:
-        st.title("🚀 NEXA: Motor Masivo")
-        
-    st.markdown("Ensambla cientos de expedientes al mismo tiempo usando tu **Plantilla de Excel** y archivos **ZIP**.")
+if opcion == "🗂️ Nexificar PDFs Masivamente":
+    st.title("🗂️ Nexificar PDFs Masivamente")
+    st.markdown("Ensambla cientos de expedientes al mismo tiempo usando tu **Plantilla de Excel** y archivos **ZIP**, o simplemente utilízalo para **renombrar** tus documentos de forma automática.")
 
     st.markdown("---")
     archivo_excel = st.file_uploader("📊 1. Sube tu Plantilla de Excel de Mapeo", type=["xlsx"])
@@ -76,11 +71,11 @@ if opcion == "1️⃣ Motor Masivo (Excel + ZIP)":
                 except: pass
         return parsed
 
-    if st.button("Ensamblar Documentos Masivamente", type="primary", use_container_width=True):
+    if st.button("Nexificar Documentos Masivamente", type="primary", use_container_width=True):
         if not archivo_excel or not archivos_zip:
             st.warning("⚠️ Por favor, sube el Excel y al menos un archivo ZIP para comenzar.")
         else:
-            with st.spinner('Ensamblando documentos mágicamente... Esto puede tomar unos segundos.'):
+            with st.spinner('Nexificando documentos mágicamente... Esto puede tomar unos segundos.'):
                 with tempfile.TemporaryDirectory() as temp_dir:
                     ruta_origen = os.path.join(temp_dir, 'origen')
                     ruta_salida = os.path.join(temp_dir, 'salida')
@@ -156,7 +151,7 @@ if opcion == "1️⃣ Motor Masivo (Excel + ZIP)":
                                 barra.progress((idx + 1) / len(df))
                             
                             if exitos > 0:
-                                st.success(f"🎉 ¡Proceso finalizado! Se ensamblaron {exitos} documentos con éxito.")
+                                st.success(f"🎉 ¡Proceso finalizado! Se nexificaron {exitos} documentos con éxito.")
                                 
                                 zip_final = os.path.join(temp_dir, 'NEXA_Resultados.zip')
                                 with zipfile.ZipFile(zip_final, 'w') as z:
@@ -182,19 +177,10 @@ if opcion == "1️⃣ Motor Masivo (Excel + ZIP)":
                         st.error(f"❌ Error leyendo el Excel: {e}")
 
 # ==========================================
-# HERRAMIENTA 2: UNIÓN RÁPIDA (Estilo iLovePDF)
+# HERRAMIENTA 2: NEXIFICAR PDFs
 # ==========================================
-elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
-    
-    if os.path.exists("logo.jpg"):
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            st.image("logo.jpg", width=120)
-        with col2:
-            st.title("Unión Rápida de PDFs")
-    else:
-        st.title("🔗 Unión Rápida de PDFs")
-        
+elif opcion == "📄🔗📄 Nexificar PDFs":
+    st.title("📄🔗📄 Nexificar PDFs")
     st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, eligiendo el orden exacto.")
 
     st.markdown("---")
@@ -205,7 +191,7 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
         diccionario_archivos = {archivo.name: archivo for archivo in archivos_subidos}
         
         st.markdown("### 2. Selecciona el orden")
-        st.info("💡 Haz clic en la caja de abajo y selecciona los archivos **en el orden en el que quieres que se unan** (El primero que elijas quedará de página 1). Puedes borrar con la 'X' y volver a seleccionar.")
+        st.info("💡 Haz clic en la caja de abajo y selecciona los archivos **en el orden en el que quieres que se unan**.")
         
         orden_seleccionado = st.multiselect("Orden final de los documentos:", nombres_archivos)
         
@@ -216,11 +202,11 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
             
         st.markdown("---")
         
-        if st.button("Unir PDFs Ahora", type="primary", use_container_width=True):
+        if st.button("Nexificar PDFs Ahora", type="primary", use_container_width=True):
             if not orden_seleccionado:
                 st.warning("⚠️ Debes seleccionar al menos un documento para unir.")
             else:
-                with st.spinner("Fusionando documentos conservando la calidad original..."):
+                with st.spinner("Nexificando documentos conservando la calidad original..."):
                     try:
                         fusionador = PdfMerger()
                         
@@ -235,7 +221,7 @@ elif opcion == "2️⃣ Unión Rápida (Múltiples PDFs)":
                         
                         buffer_salida.seek(0)
                         
-                        st.success(f"✅ ¡Documento '{nombre_final}' creado con éxito y calidad original!")
+                        st.success(f"✅ ¡Documento '{nombre_final}' creado con éxito!")
                         
                         st.download_button(
                             label="⬇️ Descargar PDF Unificado",
