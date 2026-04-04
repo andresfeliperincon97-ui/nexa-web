@@ -14,21 +14,433 @@ from io import BytesIO
 st.set_page_config(page_title="NEXA - Transformación de Procesos", page_icon="⚙️", layout="wide")
 
 # ==========================================
-# HEADER PRINCIPAL (LOGO)
+# NEXA DESIGN SYSTEM — CSS Global
+# ==========================================
+st.markdown("""
+<style>
+/* ══════════════════════════════════════════════════════
+   BASE
+══════════════════════════════════════════════════════ */
+html, body, .stApp {
+    background-color: #060F1D !important;
+    color: #C8E4F0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* Ocultar chrome de Streamlit */
+[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"]    { display: none !important; }
+#MainMenu                        { visibility: hidden !important; }
+footer                           { visibility: hidden !important; }
+.stDeployButton                  { display: none !important; }
+
+/* Área principal */
+[data-testid="stAppViewContainer"] > [data-testid="stMain"] {
+    background: #060F1D !important;
+}
+.block-container {
+    padding-top: 1.8rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 1200px !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════════════════ */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div {
+    background: #040D1A !important;
+    border-right: 1px solid rgba(27,159,216,0.12) !important;
+    min-width: 252px !important;
+    max-width: 252px !important;
+}
+[data-testid="stSidebarContent"] {
+    background: #040D1A !important;
+    padding: 0 !important;
+}
+/* Scrollbar del sidebar */
+[data-testid="stSidebar"]::-webkit-scrollbar       { width: 4px; }
+[data-testid="stSidebar"]::-webkit-scrollbar-track { background: #040D1A; }
+[data-testid="stSidebar"]::-webkit-scrollbar-thumb { background: #0F2035; border-radius: 2px; }
+
+/* Imagen del logo en sidebar */
+[data-testid="stSidebar"] [data-testid="stImage"] {
+    padding: 18px 28px 4px 28px !important;
+}
+[data-testid="stSidebar"] [data-testid="stImage"] img {
+    border-radius: 6px !important;
+}
+
+/* ── Radio nav items ── */
+[data-testid="stSidebar"] [data-testid="stRadio"] > label  { display: none !important; }
+[data-testid="stSidebar"] [data-testid="stRadio"] > div    { gap: 1px !important; padding: 0 !important; }
+
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label {
+    display: flex !important;
+    align-items: center !important;
+    padding: 10px 16px 10px 20px !important;
+    border-left: 3px solid transparent !important;
+    color: #2E4D6A !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.15px !important;
+    transition: background .15s, color .15s, border-left-color .15s !important;
+    cursor: pointer !important;
+    border-radius: 0 6px 6px 0 !important;
+    margin: 1px 8px 1px 0 !important;
+    user-select: none !important;
+    background: transparent !important;
+}
+/* Ocultar el círculo del radio */
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label > div:first-child {
+    display: none !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label:hover {
+    background: rgba(27,159,216,0.07) !important;
+    color: #5A9FC4 !important;
+    border-left-color: rgba(27,159,216,0.3) !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] > div > label:has(input:checked) {
+    border-left: 3px solid #1B9FD8 !important;
+    background: rgba(27,159,216,0.13) !important;
+    color: #1B9FD8 !important;
+    font-weight: 600 !important;
+}
+
+/* Divisor en sidebar */
+[data-testid="stSidebar"] hr { border-color: rgba(27,159,216,0.1) !important; margin: 6px 0 !important; }
+
+/* ══════════════════════════════════════════════════════
+   TIPOGRAFÍA
+══════════════════════════════════════════════════════ */
+h1 { color: #E0F0FF !important; font-weight: 700 !important; font-size: 1.55rem !important; letter-spacing: -0.2px !important; }
+h2 { color: #B8D8EE !important; }
+h3 { color: #9ABDD8 !important; }
+p  { color: #8AAEC8 !important; }
+strong { color: #C8E4F0 !important; }
+
+/* ══════════════════════════════════════════════════════
+   BOTONES
+══════════════════════════════════════════════════════ */
+[data-testid="baseButton-primary"],
+button[kind="primary"] {
+    background: #1B9FD8 !important;
+    border: none !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    letter-spacing: 0.2px !important;
+    box-shadow: 0 2px 14px rgba(27,159,216,0.28) !important;
+    transition: all .18s ease !important;
+}
+[data-testid="baseButton-primary"]:hover,
+button[kind="primary"]:hover {
+    background: #1790C5 !important;
+    box-shadow: 0 4px 24px rgba(27,159,216,0.46) !important;
+    transform: translateY(-1px) !important;
+}
+[data-testid="baseButton-primary"]:active,
+button[kind="primary"]:active { transform: translateY(0) !important; }
+
+[data-testid="baseButton-secondary"],
+button[kind="secondary"] {
+    background: rgba(27,159,216,0.07) !important;
+    border: 1px solid rgba(27,159,216,0.22) !important;
+    color: #4A8FB0 !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    transition: all .18s ease !important;
+}
+[data-testid="baseButton-secondary"]:hover,
+button[kind="secondary"]:hover {
+    background: rgba(27,159,216,0.13) !important;
+    border-color: rgba(27,159,216,0.45) !important;
+    color: #1B9FD8 !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   INPUTS DE TEXTO
+══════════════════════════════════════════════════════ */
+[data-testid="stTextInput"] label { color: #2E5070 !important; font-size: 12px !important; font-weight: 600 !important; letter-spacing: 0.3px !important; }
+[data-testid="stTextInput"] > div > div > input {
+    background: #07111C !important;
+    border: 1px solid rgba(27,159,216,0.18) !important;
+    color: #C8E4F0 !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    caret-color: #1B9FD8 !important;
+    transition: border-color .15s, box-shadow .15s !important;
+}
+[data-testid="stTextInput"] > div > div > input:focus {
+    border-color: #1B9FD8 !important;
+    box-shadow: 0 0 0 3px rgba(27,159,216,0.1) !important;
+    outline: none !important;
+}
+[data-testid="stTextInput"] > div > div > input::placeholder { color: #1A3450 !important; }
+
+/* ══════════════════════════════════════════════════════
+   FILE UPLOADER
+══════════════════════════════════════════════════════ */
+[data-testid="stFileUploader"] section {
+    background: rgba(27,159,216,0.03) !important;
+    border: 2px dashed rgba(27,159,216,0.25) !important;
+    border-radius: 12px !important;
+    transition: border-color .2s, background .2s !important;
+}
+[data-testid="stFileUploader"] section:hover {
+    border-color: rgba(27,159,216,0.5) !important;
+    background: rgba(27,159,216,0.06) !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] div,
+[data-testid="stFileUploaderDropzoneInstructions"] span {
+    color: #1E3A58 !important;
+    font-size: 13px !important;
+}
+[data-testid="stFileUploaderDropzone"] svg { color: #1B4060 !important; }
+
+/* ══════════════════════════════════════════════════════
+   CONTAINERS CON BORDE
+══════════════════════════════════════════════════════ */
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    background: #0A1626 !important;
+    border: 1px solid rgba(27,159,216,0.12) !important;
+    border-radius: 12px !important;
+    transition: border-color .18s !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"] > div:hover {
+    border-color: rgba(27,159,216,0.28) !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   DATA EDITOR
+══════════════════════════════════════════════════════ */
+[data-testid="stDataEditor"] {
+    border: 1px solid rgba(27,159,216,0.14) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   ALERTAS / INFO
+══════════════════════════════════════════════════════ */
+[data-testid="stAlert"] {
+    background: rgba(27,159,216,0.05) !important;
+    border: 1px solid rgba(27,159,216,0.16) !important;
+    border-radius: 10px !important;
+    color: #3A6888 !important;
+    font-size: 13px !important;
+}
+[data-testid="stAlert"] p { color: #3A6888 !important; }
+[data-testid="stAlert"] strong { color: #1B9FD8 !important; }
+
+/* ══════════════════════════════════════════════════════
+   PROGRESS / SPINNER
+══════════════════════════════════════════════════════ */
+[data-testid="stProgressBar"] > div > div {
+    background: linear-gradient(90deg, #1B9FD8 0%, #1DE0C0 100%) !important;
+}
+[data-testid="stSpinner"] > div > div { border-top-color: #1B9FD8 !important; }
+
+/* ══════════════════════════════════════════════════════
+   EXPANDER
+══════════════════════════════════════════════════════ */
+[data-testid="stExpander"] {
+    background: #0A1626 !important;
+    border: 1px solid rgba(27,159,216,0.12) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+}
+[data-testid="stExpanderDetails"] { background: #0A1626 !important; }
+
+/* ══════════════════════════════════════════════════════
+   CAPTIONS / HR / MISC
+══════════════════════════════════════════════════════ */
+.stCaption, [data-testid="stCaptionContainer"] { color: #1E3A58 !important; font-size: 11px !important; }
+hr { border-color: rgba(27,159,216,0.1) !important; }
+[data-testid="stMarkdownContainer"] p { color: #4A7A9C !important; }
+
+/* ══════════════════════════════════════════════════════
+   DOWNLOAD BUTTON
+══════════════════════════════════════════════════════ */
+[data-testid="stDownloadButton"] > button {
+    background: #1B9FD8 !important;
+    border: none !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 14px rgba(27,159,216,0.28) !important;
+}
+[data-testid="stDownloadButton"] > button:hover {
+    background: #1790C5 !important;
+    box-shadow: 0 4px 24px rgba(27,159,216,0.46) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   COMPONENTES REUTILIZABLES NEXA
+══════════════════════════════════════════════════════ */
+
+/* Etiquetas de sección en sidebar */
+.nx-nav-section {
+    padding: 14px 20px 4px 20px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #0F2035;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* Cabecera de página */
+.nx-page-header {
+    padding: 4px 0 20px 0;
+    border-bottom: 1px solid rgba(27,159,216,0.1);
+    margin-bottom: 22px;
+}
+.nx-page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #E0F0FF;
+    line-height: 1.3;
+}
+.nx-page-sub {
+    font-size: 13px;
+    color: #2A4A6A;
+    margin-top: 5px;
+    line-height: 1.55;
+}
+.nx-page-sub strong { color: #4A7A9C !important; }
+
+/* Barra de pasos */
+.nx-steps {
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px 0 24px 0;
+}
+.nx-step { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 90px; }
+.nx-circle {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700;
+}
+.nx-circle.done   { background: #1B9FD8; color: #fff; box-shadow: 0 0 14px rgba(27,159,216,.45); }
+.nx-circle.active { background: #1B9FD8; color: #fff; box-shadow: 0 0 22px rgba(27,159,216,.7); }
+.nx-circle.idle   { background: #07111C; color: #0F2A42; border: 2px solid #0D2035; }
+.nx-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: #0F2035; }
+.nx-label.active, .nx-label.done { color: #1B9FD8; }
+.nx-line { flex:1; height:2px; max-width:68px; border-radius:2px; margin-bottom:18px; }
+.nx-line.done { background: #1B9FD8; }
+.nx-line.idle { background: #0D2035; }
+
+/* Encabezados de sección */
+.nx-section {
+    font-size: 11px; font-weight: 700; color: #1B9FD8;
+    text-transform: uppercase; letter-spacing: 1.3px;
+    margin: 22px 0 10px 0;
+    display: flex; align-items: center; gap: 10px;
+}
+.nx-section::after {
+    content: ''; flex:1; height:1px;
+    background: linear-gradient(90deg, rgba(27,159,216,.35) 0%, transparent 100%);
+}
+
+/* Estado vacío */
+.nx-empty {
+    text-align: center; padding: 44px 24px;
+    background: #050C18; border-radius: 14px;
+    border: 2px dashed rgba(27,159,216,0.16); margin-top: 12px;
+}
+.nx-empty-icon  { font-size: 48px; margin-bottom: 12px; }
+.nx-empty-text  { font-size: 15px; color: #1E3A55; }
+.nx-empty-sub   { font-size: 12px; color: #0F2035; margin-top: 8px; }
+
+/* Tarjeta de éxito */
+.nx-success-card {
+    background: linear-gradient(135deg, #04101C 0%, #061422 100%);
+    border: 1px solid rgba(27,159,216,0.28);
+    border-radius: 14px; padding: 28px; text-align: center; margin: 14px 0;
+}
+.nx-success-icon  { font-size: 48px; margin-bottom: 10px; }
+.nx-success-title { font-size: 20px; font-weight: 700; color: #1B9FD8; margin-bottom: 6px; }
+.nx-success-sub   { font-size: 13px; color: #1E3A58; }
+.nx-success-sub strong { color: #4A8EB0 !important; }
+
+/* Sección inferior (nombre + botón) */
+.nx-export-bar {
+    border-top: 1px solid rgba(27,159,216,0.12);
+    background: linear-gradient(0deg, rgba(4,13,26,0.9) 0%, transparent 100%);
+    padding: 18px 0 4px 0;
+    margin-top: 18px;
+}
+.nx-export-label {
+    font-size: 11px; font-weight: 700; color: #0F2A42;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    margin-bottom: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ==========================================
+# SIDEBAR
 # ==========================================
 ruta_logo = None
-if os.path.exists("logo.png"):   ruta_logo = "logo.png"
-elif os.path.exists("logo.jpg"): ruta_logo = "logo.jpg"
+if os.path.exists("logo.png"):    ruta_logo = "logo.png"
+elif os.path.exists("logo.jpg"):  ruta_logo = "logo.jpg"
 elif os.path.exists("logo.jpeg"): ruta_logo = "logo.jpeg"
 
 if ruta_logo:
     try:
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            st.image(ruta_logo, use_container_width=True)
-        st.markdown("---")
+        st.sidebar.image(ruta_logo, use_container_width=True)
     except Exception:
         pass
+
+st.sidebar.markdown("""
+<div style="text-align:center;padding:6px 0 18px 0;">
+    <span style="font-size:11px;font-weight:700;color:#1B9FD8;
+    letter-spacing:1.3px;text-transform:uppercase;">Transformación de Procesos</span>
+</div>
+<div class="nx-nav-section">SUITE PDF</div>
+""", unsafe_allow_html=True)
+
+opcion = st.sidebar.radio(
+    "",
+    ("🗂️ Nexíficar PDFs Masivamente", "📄🔗📄 Nexíficar PDFs"),
+    label_visibility="collapsed"
+)
+
+st.sidebar.markdown("""
+<div class="nx-nav-section" style="margin-top:12px;">EDICIÓN</div>
+<div style="padding:9px 16px 9px 20px;color:#0F2035;font-size:13px;font-weight:500;
+            display:flex;align-items:center;gap:8px;">
+    ✏️ Editor PDF
+    <span style="font-size:10px;background:#060F1D;color:#0F2A42;
+    padding:2px 8px;border-radius:10px;font-weight:600;
+    border:1px solid rgba(27,159,216,0.08);">Próximamente</span>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("---")
+
+st.sidebar.markdown("""
+<div style="margin:6px 10px 10px 10px;padding:11px 14px;
+            background:rgba(27,159,216,0.04);
+            border:1px solid rgba(27,159,216,0.11);border-radius:8px;">
+    <div style="display:flex;align-items:flex-start;gap:9px;">
+        <span style="font-size:15px;line-height:1;">🔒</span>
+        <div>
+            <div style="font-size:11px;font-weight:700;color:#1B9FD8;margin-bottom:3px;">
+                100% Privado
+            </div>
+            <div style="font-size:10px;color:#0F2A42;line-height:1.45;">
+                Los documentos no se guardan en ningún servidor externo.
+            </div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 
 # ==========================================
 # SISTEMA DE SEGURIDAD (EL CADENERO)
@@ -37,12 +449,25 @@ if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
-    st.markdown("<h3 style='text-align: center;'>🔒 Acceso Restringido</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Por favor, ingresa tu código de acceso para entrar a la plataforma.</p>", unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 1, 1])
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
-        password = st.text_input("Contraseña / ID de acceso:", type="password")
+        st.markdown("""
+        <div style="background:#07111C;border:1px solid rgba(27,159,216,0.2);
+                    border-radius:14px;padding:32px 28px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:12px;">🔒</div>
+            <div style="font-size:18px;font-weight:700;color:#C8E4F0;margin-bottom:6px;">
+                Acceso Restringido
+            </div>
+            <div style="font-size:13px;color:#2A4A6A;margin-bottom:20px;">
+                Ingresa tu código de acceso para continuar.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        password = st.text_input("Código de acceso:", type="password",
+                                  placeholder="••••••••••••",
+                                  label_visibility="collapsed")
         if st.button("Entrar", type="primary", use_container_width=True):
             try:
                 claves_validas = list(st.secrets["accesos"].values())
@@ -50,36 +475,30 @@ if not st.session_state.autenticado:
                     st.session_state.autenticado = True
                     st.rerun()
                 else:
-                    st.error("❌ Código incorrecto o inactivo. Intenta de nuevo.")
+                    st.error("❌ Código incorrecto o inactivo.")
             except Exception:
-                st.warning("⚠️ La bóveda de contraseñas no ha sido configurada correctamente en Streamlit.")
+                st.warning("⚠️ La bóveda de contraseñas no está configurada en Streamlit.")
     st.stop()
-
-
-# ==========================================
-# MENÚ LATERAL
-# ==========================================
-st.sidebar.title("🛠️ Automatizaciones NEXA")
-st.sidebar.markdown("Elige el proceso que necesitas:")
-opcion = st.sidebar.radio(
-    "",
-    ("🗂️ Nexíficar PDFs Masivamente", "📄🔗📄 Nexíficar PDFs")
-)
-
-st.sidebar.markdown("---")
-st.sidebar.info("🔒 **100% Privado:** Los documentos procesados aquí no se guardan en ningún servidor externo.")
 
 
 # ==========================================
 # HERRAMIENTA 1: NEXÍFICAR MASIVAMENTE
 # ==========================================
 if opcion == "🗂️ Nexíficar PDFs Masivamente":
-    st.title("🗂️ Nexíficar PDFs Masivamente")
-    st.markdown("Ensambla cientos de expedientes al mismo tiempo usando tu **Plantilla de Excel** y archivos **ZIP**, o simplemente utilízalo para **renombrar** tus documentos de forma automática.")
 
-    st.markdown("---")
-    archivo_excel = st.file_uploader("📊 1. Sube tu Plantilla de Excel de Mapeo", type=["xlsx"])
-    archivos_zip  = st.file_uploader("🗂️ 2. Sube tus archivos ZIP (Puedes seleccionar varios)", type=["zip"], accept_multiple_files=True)
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">🗂️ Nexíficar PDFs Masivamente</div>
+        <div class="nx-page-sub">Ensambla cientos de expedientes al mismo tiempo usando tu
+        <strong>Plantilla de Excel</strong> y archivos <strong>ZIP</strong>,
+        o renombra documentos de forma automática.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="nx-section">📊 Archivos de entrada</div>', unsafe_allow_html=True)
+    archivo_excel = st.file_uploader("Plantilla de Excel de Mapeo (.xlsx)", type=["xlsx"])
+    archivos_zip  = st.file_uploader("Archivos ZIP con los PDFs (puedes seleccionar varios)",
+                                      type=["zip"], accept_multiple_files=True)
     st.markdown("---")
 
     def buscar_archivo_en_dir(nombre, dir_raiz):
@@ -107,11 +526,11 @@ if opcion == "🗂️ Nexíficar PDFs Masivamente":
                 except: pass
         return parsed
 
-    if st.button("Nexíficar Documentos Masivamente", type="primary", use_container_width=True):
+    if st.button("🚀 Nexíficar Documentos Masivamente", type="primary", use_container_width=True):
         if not archivo_excel or not archivos_zip:
             st.warning("⚠️ Por favor, sube el Excel y al menos un archivo ZIP para comenzar.")
         else:
-            with st.spinner('Nexíficando documentos mágicamente… Esto puede tomar unos segundos.'):
+            with st.spinner("Nexíficando documentos mágicamente… Esto puede tomar unos segundos."):
                 with tempfile.TemporaryDirectory() as temp_dir:
                     ruta_origen = os.path.join(temp_dir, 'origen')
                     ruta_salida = os.path.join(temp_dir, 'salida')
@@ -167,10 +586,12 @@ if opcion == "🗂️ Nexíficar PDFs Masivamente":
                                             reader = PdfReader(r_doc)
                                             for p_spec, p_final in p_inst:
                                                 if p_spec == 'completo':
-                                                    for i in range(len(reader.pages)): paginas_pos[p_final].append(reader.pages[i])
+                                                    for i in range(len(reader.pages)):
+                                                        paginas_pos[p_final].append(reader.pages[i])
                                                 else:
                                                     for i in p_spec:
-                                                        if i < len(reader.pages): paginas_pos[p_final].append(reader.pages[i])
+                                                        if i < len(reader.pages):
+                                                            paginas_pos[p_final].append(reader.pages[i])
                                         except Exception as e:
                                             errores.append(f"Error leyendo '{n_doc}': {e}")
                                             error_fila = True
@@ -230,87 +651,9 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         if _k not in st.session_state:
             st.session_state[_k] = _v
 
-    # ── CSS ────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <style>
-    /* ======== STEP BAR ======== */
-    .nx-steps {
-        display: flex; align-items: center; justify-content: center;
-        padding: 10px 0 28px 0;
-    }
-    .nx-step {
-        display: flex; flex-direction: column; align-items: center;
-        gap: 6px; min-width: 95px;
-    }
-    .nx-circle {
-        width: 44px; height: 44px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 16px; font-weight: 700; transition: all .3s;
-    }
-    .nx-circle.done   { background: #1D9E75; color: #fff; box-shadow: 0 0 16px rgba(29,158,117,.6); }
-    .nx-circle.active { background: #1D9E75; color: #fff; box-shadow: 0 0 24px rgba(29,158,117,.8); }
-    .nx-circle.idle   { background: #0A1826; color: #3A6A8C; border: 2px solid #1A3A5C; }
-    .nx-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #3A6A8C; }
-    .nx-label.active, .nx-label.done { color: #1D9E75; }
-    .nx-line {
-        flex: 1; height: 3px; max-width: 72px; border-radius: 2px;
-        margin-bottom: 20px; transition: background .3s;
-    }
-    .nx-line.done { background: #1D9E75; }
-    .nx-line.idle { background: #1A3A5C; }
-
-    /* ======== SECTION HEADERS ======== */
-    .nx-section {
-        font-size: 12px; font-weight: 700; color: #1D9E75;
-        text-transform: uppercase; letter-spacing: 1.1px;
-        margin: 24px 0 12px 0; display: flex; align-items: center; gap: 10px;
-    }
-    .nx-section::after {
-        content: ''; flex: 1; height: 1px;
-        background: linear-gradient(90deg, #1D9E75 0%, transparent 100%);
-    }
-
-    /* ======== NEXÍFICAR BUTTON ======== */
-    button[kind="primary"] {
-        background: linear-gradient(135deg, #1D9E75 0%, #14835D 100%) !important;
-        border: none !important; color: #fff !important;
-        border-radius: 10px !important; font-size: 17px !important;
-        font-weight: 700 !important; letter-spacing: .4px !important;
-        box-shadow: 0 4px 20px rgba(29,158,117,.45) !important;
-        transition: all .2s !important;
-    }
-    button[kind="primary"]:hover {
-        background: linear-gradient(135deg, #22B587 0%, #1AAD6E 100%) !important;
-        box-shadow: 0 6px 28px rgba(29,158,117,.65) !important;
-        transform: translateY(-2px) !important;
-    }
-    button[kind="primary"]:active { transform: translateY(0px) !important; }
-
-    /* ======== EMPTY STATE ======== */
-    .nx-empty {
-        text-align: center; padding: 48px 24px;
-        background: #071420; border-radius: 16px;
-        border: 2px dashed #1A3A5C; margin-top: 14px;
-    }
-    .nx-empty-icon  { font-size: 54px; margin-bottom: 14px; }
-    .nx-empty-text  { font-size: 16px; color: #3A6A8C; }
-    .nx-empty-sub   { font-size: 13px; color: #1A3A5C; margin-top: 8px; }
-
-    /* ======== SUCCESS CARD ======== */
-    .nx-success-card {
-        background: linear-gradient(135deg, #071F14 0%, #0A2B1C 100%);
-        border: 2px solid #1D9E75; border-radius: 16px;
-        padding: 28px; text-align: center; margin: 16px 0;
-    }
-    .nx-success-icon  { font-size: 52px; margin-bottom: 10px; }
-    .nx-success-title { font-size: 20px; font-weight: 700; color: #1D9E75; margin-bottom: 6px; }
-    .nx-success-sub   { font-size: 14px; color: #4ABFA0; }
-    </style>
-    """, unsafe_allow_html=True)
-
     # ── Helpers ────────────────────────────────────────────────────────────
     def _render_steps(step):
-        cfg = [("1", "Subir PDFs"), ("2", "Ordenar"), ("3", "Unificar")]
+        cfg = [("1", "Subir"), ("2", "Ordenar"), ("3", "Unificar")]
         html = '<div class="nx-steps">'
         for i, (num, lbl) in enumerate(cfg):
             if   i + 1 < step:  cs, ls, ic = "done",   "done",   "✓"
@@ -325,9 +668,7 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         return html + '</div>'
 
     def _get_thumb(pdf_bytes):
-        """Returns base64-encoded PNG of the first page, or empty string on failure."""
-        if not FITZ_OK:
-            return ""
+        if not FITZ_OK: return ""
         try:
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             pix = doc[0].get_pixmap(matrix=fitz.Matrix(0.9, 0.9), alpha=False)
@@ -335,9 +676,14 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         except Exception:
             return ""
 
-    # ── Title ──────────────────────────────────────────────────────────────
-    st.title("📄🔗📄 Nexíficar PDFs")
-    st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, con previsualización de miniatura y reordenamiento rápido por número de posición.")
+    # ── Cabecera de página ─────────────────────────────────────────────────
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">📄🔗📄 Nexíficar PDFs</div>
+        <div class="nx-page-sub">Sube varios PDFs sueltos y únelos en <strong>un solo archivo</strong>,
+        con previsualización de miniatura y reordenamiento por número de posición.</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # ── File uploader ──────────────────────────────────────────────────────
     st.markdown('<div class="nx-section">📂 Paso 1 — Subir PDFs</div>', unsafe_allow_html=True)
@@ -347,7 +693,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         accept_multiple_files=True
     )
 
-    # Reset when files are cleared
     if not archivos_subidos:
         st.session_state.nx_done      = False
         st.session_state.nx_buffer    = None
@@ -357,7 +702,7 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
     step = 1 if not archivos_subidos else (3 if st.session_state.nx_done else 2)
     st.markdown(_render_steps(step), unsafe_allow_html=True)
 
-    # ── Empty state ────────────────────────────────────────────────────────
+    # ── Estado vacío ───────────────────────────────────────────────────────
     if not archivos_subidos:
         st.markdown("""
         <div class="nx-empty">
@@ -368,7 +713,7 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
 
     # ── Pasos 2 / 3 ───────────────────────────────────────────────────────
     else:
-        # Build per-file metadata + thumbnails (keyed by filename)
+        # Build metadata map
         file_info_map = {}
         for arch in archivos_subidos:
             arch.seek(0)
@@ -381,15 +726,11 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
             kb  = len(raw) / 1024
             sz  = f"{kb:.1f} KB" if kb < 1024 else f"{kb/1024:.1f} MB"
             file_info_map[arch.name] = {
-                "arch":  arch,
-                "name":  arch.name,
-                "raw":   raw,
-                "pages": pages,
-                "size":  sz,
-                "thumb": _get_thumb(raw),
+                "arch": arch, "name": arch.name, "raw": raw,
+                "pages": pages, "size": sz, "thumb": _get_thumb(raw),
             }
 
-        # Sync order with uploaded file set (reset when files change)
+        # Sync order
         files_sig = hashlib.md5(
             "".join(sorted(file_info_map.keys())).encode()
         ).hexdigest()[:8]
@@ -400,25 +741,22 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
             st.session_state.nx_done      = False
             st.session_state.nx_buffer    = None
 
-        # Remove stale names in case a file was removed from the uploader
-        st.session_state.nx_order = [n for n in st.session_state.nx_order
-                                      if n in file_info_map]
+        st.session_state.nx_order = [n for n in st.session_state.nx_order if n in file_info_map]
         orden = st.session_state.nx_order
 
+        # ── PASO 2 ────────────────────────────────────────────────────────
         if not st.session_state.nx_done:
-            # ── Tabla de orden editable (Paso 2) ─────────────────────────
-            st.markdown(
-                '<div class="nx-section">📋 Paso 2 — Ajusta el orden y selecciona los PDFs</div>',
-                unsafe_allow_html=True
-            )
+
+            st.markdown('<div class="nx-section">📋 Paso 2 — Ajusta el orden y selecciona los PDFs</div>',
+                        unsafe_allow_html=True)
             st.info(
-                "Edita los números de la columna **Orden** para cambiar la posición de cada PDF. "
-                "Desmarca **✓** para excluir un archivo del resultado final. "
-                "Cuando termines, pulsa **Aplicar orden**.",
+                "Edita los números de **Orden** para cambiar la posición. "
+                "Desmarca **✓** para excluir un PDF del resultado. "
+                "Pulsa **Aplicar orden** para confirmar.",
                 icon="ℹ️"
             )
 
-            # Construir dataframe desde el orden actual
+            # Tabla de orden editable
             order_df = pd.DataFrame([
                 {
                     "Orden":   i + 1,
@@ -459,12 +797,10 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                     st.session_state.nx_editor_ver += 1
                     st.rerun()
 
-            # ── Vista previa de miniaturas en el orden actual ─────────────
+            # Vista previa de miniaturas
             if orden:
-                st.markdown(
-                    '<div class="nx-section">🖼️ Vista previa del orden actual</div>',
-                    unsafe_allow_html=True
-                )
+                st.markdown('<div class="nx-section">🖼️ Vista previa del orden actual</div>',
+                            unsafe_allow_html=True)
                 CARDS_PER_ROW = 4
                 for row_start in range(0, len(orden), CARDS_PER_ROW):
                     row_slice = orden[row_start : row_start + CARDS_PER_ROW]
@@ -475,44 +811,54 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                         with cols[col_offset]:
                             with st.container(border=True):
                                 if fi["thumb"]:
-                                    st.image(
-                                        base64.b64decode(fi["thumb"]),
-                                        use_container_width=True
-                                    )
+                                    st.image(base64.b64decode(fi["thumb"]),
+                                             use_container_width=True)
                                 else:
                                     st.markdown(
-                                        '<div style="background:#0D1E30;border-radius:8px;'
+                                        '<div style="background:#07111C;border-radius:8px;'
                                         'height:100px;display:flex;align-items:center;'
-                                        'justify-content:center;font-size:34px;">📄</div>',
+                                        'justify-content:center;font-size:32px;">📄</div>',
                                         unsafe_allow_html=True
                                     )
                                 short = (fi["name"][:22] + "…") if len(fi["name"]) > 22 else fi["name"]
                                 st.markdown(
-                                    f'<div style="font-size:12px;font-weight:600;color:#C8E8DF;'
+                                    f'<div style="font-size:12px;font-weight:600;color:#C8E4F0;'
                                     f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
                                     f'margin:5px 0 2px 0;">'
-                                    f'<span style="background:#1D9E75;color:#fff;border-radius:50%;'
-                                    f'padding:1px 7px;margin-right:5px;font-size:11px;'
-                                    f'font-weight:700;">{idx + 1}</span>{short}</div>',
+                                    f'<span style="background:#1B9FD8;color:#fff;'
+                                    f'border-radius:50%;padding:1px 7px;margin-right:5px;'
+                                    f'font-size:11px;font-weight:700;">{idx + 1}</span>'
+                                    f'{short}</div>',
                                     unsafe_allow_html=True
                                 )
                                 st.caption(f"📄 {fi['pages']} pág. · 💾 {fi['size']}")
 
-            # ── File name ─────────────────────────────────────────────────
-            st.markdown('<div class="nx-section">💾 Nombre del PDF final</div>',
+            # ── Sección inferior: nombre + botón Nexíficar ─────────────────
+            st.markdown('<div class="nx-export-bar">', unsafe_allow_html=True)
+            st.markdown('<div class="nx-export-label">💾 Nombre del PDF final y exportación</div>',
                         unsafe_allow_html=True)
-            nombre_final = st.text_input(
-                "Nombre del archivo unificado:",
-                "Documento_Unificado.pdf",
-                label_visibility="collapsed"
-            )
-            if not nombre_final.lower().endswith(".pdf"):
-                nombre_final += ".pdf"
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown("<br>", unsafe_allow_html=True)
+            col_name, col_btn = st.columns([3, 1])
+            with col_name:
+                nombre_final = st.text_input(
+                    "Nombre del archivo unificado:",
+                    "Documento_Unificado.pdf",
+                    label_visibility="collapsed",
+                    placeholder="Nombre_del_archivo_final.pdf"
+                )
+                if not nombre_final.lower().endswith(".pdf"):
+                    nombre_final += ".pdf"
+            with col_btn:
+                st.markdown("<br>", unsafe_allow_html=True)
+                nexificar = st.button(
+                    f"🔗 Nexíficar {len(orden)} PDFs",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=(len(orden) == 0)
+                )
 
-            # ── NEXÍFICAR BUTTON ──────────────────────────────────────────
-            if st.button(f"🔗 Nexíficar {len(orden)} PDFs", type="primary", use_container_width=True):
+            if nexificar:
                 if not orden:
                     st.warning("⚠️ No hay documentos para unir.")
                 else:
@@ -534,15 +880,17 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                         except Exception as e:
                             st.error(f"❌ Error al unir los archivos: {e}")
 
-        # ── Paso 3: éxito + descarga ──────────────────────────────────────
+        # ── PASO 3: éxito + descarga ───────────────────────────────────────
         else:
             total = len(orden)
             st.markdown(f"""
             <div class="nx-success-card">
                 <div class="nx-success-icon">🎉</div>
                 <div class="nx-success-title">¡Nexíficación completada!</div>
-                <div class="nx-success-sub">{total} PDF{'s' if total != 1 else ''} unidos en
-                <strong>{st.session_state.nx_nombre}</strong></div>
+                <div class="nx-success-sub">
+                    {total} PDF{'s' if total != 1 else ''} unidos en
+                    <strong>{st.session_state.nx_nombre}</strong>
+                </div>
             </div>""", unsafe_allow_html=True)
 
             st.download_button(
