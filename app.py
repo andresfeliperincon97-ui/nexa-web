@@ -46,7 +46,7 @@ footer                           { visibility: hidden !important; }
 }
 
 /* ══════════════════════════════════════════════════════
-   SIDEBAR
+   SIDEBAR — FIX TOGGLE COLAPSAR/EXPANDIR
 ══════════════════════════════════════════════════════ */
 [data-testid="stSidebar"],
 [data-testid="stSidebar"] > div {
@@ -59,6 +59,14 @@ footer                           { visibility: hidden !important; }
     background: #040D1A !important;
     padding: 0 !important;
 }
+
+/* Ocultar el botón nativo de colapsar de Streamlit */
+[data-testid="collapsedControl"],
+button[data-testid="baseButton-headerNoPadding"],
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
+
 /* Scrollbar del sidebar */
 [data-testid="stSidebar"]::-webkit-scrollbar       { width: 4px; }
 [data-testid="stSidebar"]::-webkit-scrollbar-track { background: #040D1A; }
@@ -92,7 +100,6 @@ footer                           { visibility: hidden !important; }
     user-select: none !important;
     background: transparent !important;
 }
-/* Ocultar el círculo del radio */
 [data-testid="stSidebar"] [data-testid="stRadio"] > div > label > div:first-child {
     display: none !important;
 }
@@ -110,6 +117,49 @@ footer                           { visibility: hidden !important; }
 
 /* Divisor en sidebar */
 [data-testid="stSidebar"] hr { border-color: rgba(27,159,216,0.1) !important; margin: 6px 0 !important; }
+
+/* ══════════════════════════════════════════════════════
+   BOTÓN TOGGLE SIDEBAR PERSONALIZADO
+══════════════════════════════════════════════════════ */
+#nx-sidebar-toggle {
+    position: fixed;
+    top: 50%;
+    left: 252px;
+    transform: translateY(-50%);
+    z-index: 99999;
+    width: 20px;
+    height: 56px;
+    background: #040D1A;
+    border: 1px solid rgba(27,159,216,0.25);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: left 0.3s ease, background 0.2s, border-color 0.2s;
+    box-shadow: 3px 0 12px rgba(0,0,0,0.4);
+}
+#nx-sidebar-toggle:hover {
+    background: #061422;
+    border-color: rgba(27,159,216,0.5);
+}
+#nx-sidebar-toggle svg {
+    transition: transform 0.3s ease;
+}
+body.nx-sidebar-collapsed #nx-sidebar-toggle {
+    left: 0px;
+}
+body.nx-sidebar-collapsed #nx-sidebar-toggle svg {
+    transform: rotate(180deg);
+}
+body.nx-sidebar-collapsed [data-testid="stSidebar"] {
+    margin-left: -252px !important;
+    transition: margin-left 0.3s ease !important;
+}
+[data-testid="stSidebar"] {
+    transition: margin-left 0.3s ease !important;
+}
 
 /* ══════════════════════════════════════════════════════
    TIPOGRAFÍA
@@ -141,9 +191,6 @@ button[kind="primary"]:hover {
     box-shadow: 0 4px 24px rgba(27,159,216,0.46) !important;
     transform: translateY(-1px) !important;
 }
-[data-testid="baseButton-primary"]:active,
-button[kind="primary"]:active { transform: translateY(0) !important; }
-
 [data-testid="baseButton-secondary"],
 button[kind="secondary"] {
     background: rgba(27,159,216,0.07) !important;
@@ -182,6 +229,34 @@ button[kind="secondary"]:hover {
 [data-testid="stTextInput"] > div > div > input::placeholder { color: #1A3450 !important; }
 
 /* ══════════════════════════════════════════════════════
+   SELECT BOX
+══════════════════════════════════════════════════════ */
+[data-testid="stSelectbox"] label { color: #2E5070 !important; font-size: 12px !important; font-weight: 600 !important; }
+[data-testid="stSelectbox"] > div > div {
+    background: #07111C !important;
+    border: 1px solid rgba(27,159,216,0.18) !important;
+    color: #C8E4F0 !important;
+    border-radius: 8px !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   NUMBER INPUT
+══════════════════════════════════════════════════════ */
+[data-testid="stNumberInput"] label { color: #2E5070 !important; font-size: 12px !important; font-weight: 600 !important; }
+[data-testid="stNumberInput"] input {
+    background: #07111C !important;
+    border: 1px solid rgba(27,159,216,0.18) !important;
+    color: #C8E4F0 !important;
+    border-radius: 8px !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   SLIDER
+══════════════════════════════════════════════════════ */
+[data-testid="stSlider"] label { color: #2E5070 !important; font-size: 12px !important; font-weight: 600 !important; }
+[data-testid="stSlider"] [data-testid="stTickBar"] { background: #1B9FD8 !important; }
+
+/* ══════════════════════════════════════════════════════
    FILE UPLOADER
 ══════════════════════════════════════════════════════ */
 [data-testid="stFileUploader"] section {
@@ -199,7 +274,6 @@ button[kind="secondary"]:hover {
     color: #1E3A58 !important;
     font-size: 13px !important;
 }
-[data-testid="stFileUploaderDropzone"] svg { color: #1B4060 !important; }
 
 /* ══════════════════════════════════════════════════════
    CONTAINERS CON BORDE
@@ -280,10 +354,54 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 }
 
 /* ══════════════════════════════════════════════════════
+   TARJETAS DE HERRAMIENTAS (estilo iLovePDF)
+══════════════════════════════════════════════════════ */
+.nx-tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+.nx-tool-card {
+    background: #0A1626;
+    border: 1px solid rgba(27,159,216,0.12);
+    border-radius: 14px;
+    padding: 24px 18px 20px 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: block;
+}
+.nx-tool-card:hover {
+    border-color: rgba(27,159,216,0.45);
+    background: #0D1E35;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(27,159,216,0.15);
+}
+.nx-tool-card.active {
+    border-color: #1B9FD8;
+    background: rgba(27,159,216,0.08);
+    box-shadow: 0 0 0 2px rgba(27,159,216,0.2);
+}
+.nx-tool-icon { font-size: 36px; margin-bottom: 10px; display: block; }
+.nx-tool-name {
+    font-size: 13px; font-weight: 700;
+    color: #C8E4F0; margin-bottom: 5px;
+}
+.nx-tool-desc { font-size: 11px; color: #2A4A6A; line-height: 1.4; }
+.nx-tool-badge {
+    display: inline-block; margin-top: 8px;
+    font-size: 10px; font-weight: 700;
+    background: rgba(27,159,216,0.1);
+    color: #1B9FD8;
+    padding: 2px 8px; border-radius: 10px;
+    border: 1px solid rgba(27,159,216,0.2);
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTES REUTILIZABLES NEXA
 ══════════════════════════════════════════════════════ */
-
-/* Etiquetas de sección en sidebar */
 .nx-nav-section {
     padding: 14px 20px 4px 20px;
     font-size: 10px;
@@ -292,38 +410,18 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
     letter-spacing: 2px;
     text-transform: uppercase;
 }
-
-/* Cabecera de página */
 .nx-page-header {
     padding: 4px 0 20px 0;
     border-bottom: 1px solid rgba(27,159,216,0.1);
     margin-bottom: 22px;
 }
-.nx-page-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: #E0F0FF;
-    line-height: 1.3;
-}
-.nx-page-sub {
-    font-size: 13px;
-    color: #2A4A6A;
-    margin-top: 5px;
-    line-height: 1.55;
-}
+.nx-page-title { font-size: 22px; font-weight: 700; color: #E0F0FF; line-height: 1.3; }
+.nx-page-sub { font-size: 13px; color: #2A4A6A; margin-top: 5px; line-height: 1.55; }
 .nx-page-sub strong { color: #4A7A9C !important; }
 
-/* Barra de pasos */
-.nx-steps {
-    display: flex; align-items: center; justify-content: center;
-    padding: 8px 0 24px 0;
-}
+.nx-steps { display: flex; align-items: center; justify-content: center; padding: 8px 0 24px 0; }
 .nx-step { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 90px; }
-.nx-circle {
-    width: 40px; height: 40px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 700;
-}
+.nx-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; }
 .nx-circle.done   { background: #1B9FD8; color: #fff; box-shadow: 0 0 14px rgba(27,159,216,.45); }
 .nx-circle.active { background: #1B9FD8; color: #fff; box-shadow: 0 0 22px rgba(27,159,216,.7); }
 .nx-circle.idle   { background: #07111C; color: #0F2A42; border: 2px solid #0D2035; }
@@ -333,7 +431,6 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 .nx-line.done { background: #1B9FD8; }
 .nx-line.idle { background: #0D2035; }
 
-/* Encabezados de sección */
 .nx-section {
     font-size: 11px; font-weight: 700; color: #1B9FD8;
     text-transform: uppercase; letter-spacing: 1.3px;
@@ -344,8 +441,6 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
     content: ''; flex:1; height:1px;
     background: linear-gradient(90deg, rgba(27,159,216,.35) 0%, transparent 100%);
 }
-
-/* Estado vacío */
 .nx-empty {
     text-align: center; padding: 44px 24px;
     background: #050C18; border-radius: 14px;
@@ -355,7 +450,6 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 .nx-empty-text  { font-size: 15px; color: #1E3A55; }
 .nx-empty-sub   { font-size: 12px; color: #0F2035; margin-top: 8px; }
 
-/* Tarjeta de éxito */
 .nx-success-card {
     background: linear-gradient(135deg, #04101C 0%, #061422 100%);
     border: 1px solid rgba(27,159,216,0.28);
@@ -366,7 +460,6 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 .nx-success-sub   { font-size: 13px; color: #1E3A58; }
 .nx-success-sub strong { color: #4A8EB0 !important; }
 
-/* Sección inferior (nombre + botón) */
 .nx-export-bar {
     border-top: 1px solid rgba(27,159,216,0.12);
     background: linear-gradient(0deg, rgba(4,13,26,0.9) 0%, transparent 100%);
@@ -381,6 +474,31 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 </style>
 """, unsafe_allow_html=True)
 
+# ==========================================
+# BOTÓN TOGGLE SIDEBAR (JS — fix expandir/colapsar)
+# ==========================================
+st.markdown("""
+<div id="nx-sidebar-toggle" onclick="toggleSidebar()" title="Mostrar / Ocultar menú">
+    <svg width="10" height="16" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7 2L2 8L7 14" stroke="#1B9FD8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+</div>
+<script>
+(function() {
+    var collapsed = false;
+
+    function toggleSidebar() {
+        collapsed = !collapsed;
+        if (collapsed) {
+            document.body.classList.add('nx-sidebar-collapsed');
+        } else {
+            document.body.classList.remove('nx-sidebar-collapsed');
+        }
+    }
+    window.toggleSidebar = toggleSidebar;
+})();
+</script>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # SIDEBAR
@@ -406,20 +524,16 @@ st.sidebar.markdown("""
 
 opcion = st.sidebar.radio(
     "",
-    ("🗂️ Nexíficar PDFs Masivamente", "📄🔗📄 Nexíficar PDFs"),
+    (
+        "🗂️ Nexíficar PDFs Masivamente",
+        "📄🔗📄 Nexíficar PDFs",
+        "✂️ Dividir PDF",
+        "🗜️ Comprimir PDF",
+        "🔗 Merge PDF",
+        "✏️ Editar PDF",
+    ),
     label_visibility="collapsed"
 )
-
-st.sidebar.markdown("""
-<div class="nx-nav-section" style="margin-top:12px;">EDICIÓN</div>
-<div style="padding:9px 16px 9px 20px;color:#0F2035;font-size:13px;font-weight:500;
-            display:flex;align-items:center;gap:8px;">
-    ✏️ Editor PDF
-    <span style="font-size:10px;background:#060F1D;color:#0F2A42;
-    padding:2px 8px;border-radius:10px;font-weight:600;
-    border:1px solid rgba(27,159,216,0.08);">Próximamente</span>
-</div>
-""", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 
@@ -443,7 +557,7 @@ st.sidebar.markdown("""
 
 
 # ==========================================
-# SISTEMA DE SEGURIDAD (EL CADENERO)
+# SISTEMA DE SEGURIDAD
 # ==========================================
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
@@ -643,7 +757,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
     except ImportError:
         FITZ_OK = False
 
-    # ── Session state ──────────────────────────────────────────────────────
     for _k, _v in [("nx_done", False), ("nx_buffer", None),
                    ("nx_nombre", "Documento_Unificado.pdf"),
                    ("nx_order", []), ("nx_files_sig", ""),
@@ -651,7 +764,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         if _k not in st.session_state:
             st.session_state[_k] = _v
 
-    # ── Helpers ────────────────────────────────────────────────────────────
     def _render_steps(step):
         cfg = [("1", "Subir"), ("2", "Ordenar"), ("3", "Unificar")]
         html = '<div class="nx-steps">'
@@ -676,7 +788,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         except Exception:
             return ""
 
-    # ── Cabecera de página ─────────────────────────────────────────────────
     st.markdown("""
     <div class="nx-page-header">
         <div class="nx-page-title">📄🔗📄 Nexíficar PDFs</div>
@@ -685,7 +796,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── File uploader ──────────────────────────────────────────────────────
     st.markdown('<div class="nx-section">📂 Paso 1 — Subir PDFs</div>', unsafe_allow_html=True)
     archivos_subidos = st.file_uploader(
         "Selecciona o arrastra tus archivos PDF aquí",
@@ -702,7 +812,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
     step = 1 if not archivos_subidos else (3 if st.session_state.nx_done else 2)
     st.markdown(_render_steps(step), unsafe_allow_html=True)
 
-    # ── Estado vacío ───────────────────────────────────────────────────────
     if not archivos_subidos:
         st.markdown("""
         <div class="nx-empty">
@@ -711,9 +820,7 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
             <div class="nx-empty-sub">Puedes seleccionar múltiples archivos a la vez</div>
         </div>""", unsafe_allow_html=True)
 
-    # ── Pasos 2 / 3 ───────────────────────────────────────────────────────
     else:
-        # Build metadata map
         file_info_map = {}
         for arch in archivos_subidos:
             arch.seek(0)
@@ -730,7 +837,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                 "pages": pages, "size": sz, "thumb": _get_thumb(raw),
             }
 
-        # Sync order
         files_sig = hashlib.md5(
             "".join(sorted(file_info_map.keys())).encode()
         ).hexdigest()[:8]
@@ -744,9 +850,7 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         st.session_state.nx_order = [n for n in st.session_state.nx_order if n in file_info_map]
         orden = st.session_state.nx_order
 
-        # ── PASO 2 ────────────────────────────────────────────────────────
         if not st.session_state.nx_done:
-
             st.markdown('<div class="nx-section">📋 Paso 2 — Ajusta el orden y selecciona los PDFs</div>',
                         unsafe_allow_html=True)
             st.info(
@@ -756,7 +860,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                 icon="ℹ️"
             )
 
-            # Tabla de orden editable
             order_df = pd.DataFrame([
                 {
                     "Orden":   i + 1,
@@ -797,7 +900,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                     st.session_state.nx_editor_ver += 1
                     st.rerun()
 
-            # Vista previa de miniaturas
             if orden:
                 st.markdown('<div class="nx-section">🖼️ Vista previa del orden actual</div>',
                             unsafe_allow_html=True)
@@ -833,7 +935,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                                 )
                                 st.caption(f"📄 {fi['pages']} pág. · 💾 {fi['size']}")
 
-            # ── Sección inferior: nombre + botón Nexíficar ─────────────────
             st.markdown('<div class="nx-export-bar">', unsafe_allow_html=True)
             st.markdown('<div class="nx-export-label">💾 Nombre del PDF final y exportación</div>',
                         unsafe_allow_html=True)
@@ -880,7 +981,6 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                         except Exception as e:
                             st.error(f"❌ Error al unir los archivos: {e}")
 
-        # ── PASO 3: éxito + descarga ───────────────────────────────────────
         else:
             total = len(orden)
             st.markdown(f"""
@@ -910,3 +1010,668 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
                 st.session_state.nx_files_sig  = ""
                 st.session_state.nx_editor_ver = 0
                 st.rerun()
+
+
+# ==========================================
+# HERRAMIENTA 3: DIVIDIR PDF
+# ==========================================
+elif opcion == "✂️ Dividir PDF":
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">✂️ Dividir PDF</div>
+        <div class="nx-page-sub">Extrae páginas individuales o rangos específicos de cualquier PDF.
+        Elige el modo que necesitas y descarga el resultado al instante.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    archivo_split = st.file_uploader("Sube tu archivo PDF", type=["pdf"], key="split_uploader")
+
+    if not archivo_split:
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">✂️</div>
+            <div class="nx-empty-text">Sube un PDF para comenzar a dividirlo</div>
+            <div class="nx-empty-sub">Formatos soportados: PDF</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        archivo_split.seek(0)
+        raw_split = archivo_split.read()
+        try:
+            reader_split = PdfReader(BytesIO(raw_split))
+            total_pages  = len(reader_split.pages)
+        except Exception as e:
+            st.error(f"❌ No se pudo leer el PDF: {e}")
+            st.stop()
+
+        st.markdown(f"""
+        <div style="background:#0A1626;border:1px solid rgba(27,159,216,0.15);border-radius:10px;
+                    padding:14px 20px;margin:12px 0;display:flex;align-items:center;gap:14px;">
+            <span style="font-size:28px;">📄</span>
+            <div>
+                <div style="font-size:14px;font-weight:600;color:#C8E4F0;">{archivo_split.name}</div>
+                <div style="font-size:12px;color:#2A4A6A;margin-top:3px;">
+                    {total_pages} páginas · {len(raw_split)/1024:.1f} KB
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="nx-section">⚙️ Modo de división</div>', unsafe_allow_html=True)
+
+        modo_split = st.radio(
+            "Modo:",
+            ["📄 Extraer páginas específicas", "📚 Dividir en páginas individuales",
+             "📐 Dividir en rangos iguales", "✂️ Dividir por rango personalizado"],
+            label_visibility="collapsed"
+        )
+
+        nombre_split = st.text_input("Nombre base del archivo resultado:",
+                                      value=archivo_split.name.replace(".pdf", ""),
+                                      placeholder="mi_documento")
+
+        if modo_split == "📄 Extraer páginas específicas":
+            st.info("Ingresa las páginas que quieres extraer. Ejemplo: `1,3,5-8,12`", icon="ℹ️")
+            paginas_input = st.text_input("Páginas a extraer:", placeholder="1,3,5-8,12")
+
+            if st.button("✂️ Extraer páginas", type="primary", use_container_width=True):
+                if not paginas_input.strip():
+                    st.warning("⚠️ Ingresa al menos una página.")
+                else:
+                    try:
+                        indices = set()
+                        for parte in paginas_input.split(","):
+                            parte = parte.strip()
+                            if "-" in parte:
+                                a, b = parte.split("-")
+                                indices.update(range(int(a)-1, int(b)))
+                            else:
+                                indices.add(int(parte)-1)
+                        indices = sorted([i for i in indices if 0 <= i < total_pages])
+                        if not indices:
+                            st.error("❌ Ninguna página válida encontrada.")
+                        else:
+                            writer = PdfWriter()
+                            for i in indices:
+                                writer.add_page(reader_split.pages[i])
+                            buf = BytesIO()
+                            writer.write(buf)
+                            buf.seek(0)
+                            st.success(f"✅ {len(indices)} páginas extraídas correctamente.")
+                            st.download_button(
+                                label="⬇️ Descargar PDF",
+                                data=buf.getvalue(),
+                                file_name=f"{nombre_split}_extraido.pdf",
+                                mime="application/pdf",
+                                type="primary",
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        st.error(f"❌ Error al procesar: {e}")
+
+        elif modo_split == "📚 Dividir en páginas individuales":
+            st.info(f"Se generarán **{total_pages} PDFs** de una página cada uno, empaquetados en un ZIP.", icon="ℹ️")
+
+            if st.button("✂️ Dividir en páginas individuales", type="primary", use_container_width=True):
+                with st.spinner("Dividiendo páginas…"):
+                    try:
+                        zip_buf = BytesIO()
+                        with zipfile.ZipFile(zip_buf, "w") as zf:
+                            for i in range(total_pages):
+                                writer = PdfWriter()
+                                writer.add_page(reader_split.pages[i])
+                                page_buf = BytesIO()
+                                writer.write(page_buf)
+                                zf.writestr(f"{nombre_split}_pagina_{i+1:03d}.pdf", page_buf.getvalue())
+                        zip_buf.seek(0)
+                        st.success(f"✅ {total_pages} páginas generadas correctamente.")
+                        st.download_button(
+                            label="⬇️ Descargar ZIP con todas las páginas",
+                            data=zip_buf.getvalue(),
+                            file_name=f"{nombre_split}_paginas.zip",
+                            mime="application/zip",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+
+        elif modo_split == "📐 Dividir en rangos iguales":
+            paginas_por_parte = st.number_input(
+                f"Páginas por parte (total: {total_pages}):",
+                min_value=1, max_value=total_pages, value=min(5, total_pages), step=1
+            )
+            partes = (total_pages + int(paginas_por_parte) - 1) // int(paginas_por_parte)
+            st.caption(f"Se generarán **{partes} archivos**.")
+
+            if st.button("✂️ Dividir en partes iguales", type="primary", use_container_width=True):
+                with st.spinner("Dividiendo…"):
+                    try:
+                        zip_buf = BytesIO()
+                        with zipfile.ZipFile(zip_buf, "w") as zf:
+                            for p in range(partes):
+                                writer = PdfWriter()
+                                inicio = p * int(paginas_por_parte)
+                                fin    = min(inicio + int(paginas_por_parte), total_pages)
+                                for i in range(inicio, fin):
+                                    writer.add_page(reader_split.pages[i])
+                                part_buf = BytesIO()
+                                writer.write(part_buf)
+                                zf.writestr(f"{nombre_split}_parte_{p+1:02d}.pdf", part_buf.getvalue())
+                        zip_buf.seek(0)
+                        st.success(f"✅ {partes} partes generadas correctamente.")
+                        st.download_button(
+                            label="⬇️ Descargar ZIP",
+                            data=zip_buf.getvalue(),
+                            file_name=f"{nombre_split}_partes.zip",
+                            mime="application/zip",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+
+        elif modo_split == "✂️ Dividir por rango personalizado":
+            st.info("Define dónde dividir el PDF. Ejemplo: `5,10,15` divide en páginas 1-5, 6-10, 11-15, 16-fin.", icon="ℹ️")
+            puntos_input = st.text_input(f"Puntos de corte (1-{total_pages}):", placeholder="5,10,15")
+
+            if st.button("✂️ Dividir por puntos de corte", type="primary", use_container_width=True):
+                if not puntos_input.strip():
+                    st.warning("⚠️ Ingresa al menos un punto de corte.")
+                else:
+                    try:
+                        puntos = sorted([int(x.strip()) for x in puntos_input.split(",")])
+                        rangos = []
+                        prev = 0
+                        for p in puntos:
+                            if 0 < p <= total_pages:
+                                rangos.append((prev, p))
+                                prev = p
+                        rangos.append((prev, total_pages))
+
+                        zip_buf = BytesIO()
+                        with zipfile.ZipFile(zip_buf, "w") as zf:
+                            for idx_r, (ini, fin) in enumerate(rangos):
+                                if ini >= fin: continue
+                                writer = PdfWriter()
+                                for i in range(ini, fin):
+                                    writer.add_page(reader_split.pages[i])
+                                part_buf = BytesIO()
+                                writer.write(part_buf)
+                                zf.writestr(f"{nombre_split}_seccion_{idx_r+1:02d}.pdf", part_buf.getvalue())
+                        zip_buf.seek(0)
+                        st.success(f"✅ {len(rangos)} secciones generadas correctamente.")
+                        st.download_button(
+                            label="⬇️ Descargar ZIP",
+                            data=zip_buf.getvalue(),
+                            file_name=f"{nombre_split}_secciones.zip",
+                            mime="application/zip",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error al procesar: {e}")
+
+
+# ==========================================
+# HERRAMIENTA 4: COMPRIMIR PDF
+# ==========================================
+elif opcion == "🗜️ Comprimir PDF":
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">🗜️ Comprimir PDF</div>
+        <div class="nx-page-sub">Reduce el tamaño de tus PDFs eliminando metadatos innecesarios
+        y optimizando la estructura interna del archivo.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    archivo_comp = st.file_uploader("Sube tu archivo PDF", type=["pdf"], key="comp_uploader")
+
+    if not archivo_comp:
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">🗜️</div>
+            <div class="nx-empty-text">Sube un PDF para comprimirlo</div>
+            <div class="nx-empty-sub">Se optimizará la estructura interna del archivo</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        archivo_comp.seek(0)
+        raw_comp = archivo_comp.read()
+        tam_orig = len(raw_comp)
+
+        try:
+            reader_comp = PdfReader(BytesIO(raw_comp))
+            total_pages_comp = len(reader_comp.pages)
+        except Exception as e:
+            st.error(f"❌ No se pudo leer el PDF: {e}")
+            st.stop()
+
+        st.markdown(f"""
+        <div style="background:#0A1626;border:1px solid rgba(27,159,216,0.15);border-radius:10px;
+                    padding:14px 20px;margin:12px 0;display:flex;align-items:center;gap:14px;">
+            <span style="font-size:28px;">📄</span>
+            <div>
+                <div style="font-size:14px;font-weight:600;color:#C8E4F0;">{archivo_comp.name}</div>
+                <div style="font-size:12px;color:#2A4A6A;margin-top:3px;">
+                    {total_pages_comp} páginas · Tamaño original: <strong style="color:#C8E4F0;">{tam_orig/1024:.1f} KB</strong>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="nx-section">⚙️ Nivel de compresión</div>', unsafe_allow_html=True)
+        nivel = st.select_slider(
+            "Nivel:",
+            options=["Baja (máxima calidad)", "Media (equilibrado)", "Alta (mínimo tamaño)"],
+            value="Media (equilibrado)",
+            label_visibility="collapsed"
+        )
+
+        st.info(
+            "**Baja**: Elimina solo metadatos · "
+            "**Media**: Optimiza streams y objetos · "
+            "**Alta**: Compresión máxima de streams",
+            icon="ℹ️"
+        )
+
+        if st.button("🗜️ Comprimir PDF", type="primary", use_container_width=True):
+            with st.spinner("Comprimiendo…"):
+                try:
+                    writer_comp = PdfWriter()
+                    for page in reader_comp.pages:
+                        if nivel == "Alta (mínimo tamaño)":
+                            page.compress_content_streams()
+                        writer_comp.add_page(page)
+
+                    # Eliminar metadatos en nivel medio y alto
+                    if nivel != "Baja (máxima calidad)":
+                        writer_comp.add_metadata({})
+
+                    buf_comp = BytesIO()
+                    writer_comp.write(buf_comp)
+                    buf_comp.seek(0)
+                    tam_nuevo = len(buf_comp.getvalue())
+                    reduccion = max(0, (1 - tam_nuevo / tam_orig) * 100)
+
+                    col_a, col_b, col_c = st.columns(3)
+                    with col_a:
+                        st.metric("Tamaño original", f"{tam_orig/1024:.1f} KB")
+                    with col_b:
+                        st.metric("Tamaño nuevo", f"{tam_nuevo/1024:.1f} KB")
+                    with col_c:
+                        st.metric("Reducción", f"{reduccion:.1f}%",
+                                  delta=f"-{(tam_orig-tam_nuevo)/1024:.1f} KB" if tam_nuevo < tam_orig else "Sin cambio")
+
+                    nombre_comp = archivo_comp.name.replace(".pdf", "_comprimido.pdf")
+                    st.download_button(
+                        label="⬇️ Descargar PDF Comprimido",
+                        data=buf_comp.getvalue(),
+                        file_name=nombre_comp,
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"❌ Error al comprimir: {e}")
+
+
+# ==========================================
+# HERRAMIENTA 5: MERGE PDF
+# ==========================================
+elif opcion == "🔗 Merge PDF":
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">🔗 Merge PDF</div>
+        <div class="nx-page-sub">Combina múltiples PDFs en un solo documento.
+        Sube los archivos, define el orden con los números y descarga el resultado.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    archivos_merge = st.file_uploader(
+        "Selecciona los PDFs a combinar",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="merge_uploader"
+    )
+
+    if not archivos_merge:
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">🔗</div>
+            <div class="nx-empty-text">Sube dos o más PDFs para combinarlos</div>
+            <div class="nx-empty-sub">Podrás definir el orden antes de descargar</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        # Tabla de orden
+        merge_data = []
+        merge_bytes = {}
+        for i, f in enumerate(archivos_merge):
+            f.seek(0)
+            raw = f.read()
+            merge_bytes[f.name] = raw
+            try:
+                pgs = len(PdfReader(BytesIO(raw)).pages)
+            except Exception:
+                pgs = "?"
+            kb = len(raw) / 1024
+            sz = f"{kb:.1f} KB" if kb < 1024 else f"{kb/1024:.1f} MB"
+            merge_data.append({"Orden": i+1, "✓": True, "Archivo": f.name,
+                                "Páginas": str(pgs), "Tamaño": sz})
+
+        merge_df = pd.DataFrame(merge_data)
+        st.markdown('<div class="nx-section">📋 Define el orden de combinación</div>',
+                    unsafe_allow_html=True)
+
+        edited_merge = st.data_editor(
+            merge_df,
+            column_config={
+                "Orden":   st.column_config.NumberColumn("Orden", min_value=1,
+                               max_value=len(archivos_merge), step=1, width="small"),
+                "✓":       st.column_config.CheckboxColumn("✓", width="small"),
+                "Archivo": st.column_config.TextColumn("Archivo", disabled=True),
+                "Páginas": st.column_config.TextColumn("Páginas", disabled=True, width="small"),
+                "Tamaño":  st.column_config.TextColumn("Tamaño",  disabled=True, width="small"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="merge_editor"
+        )
+
+        nombre_merge = st.text_input("Nombre del archivo resultado:",
+                                      value="Documentos_Combinados.pdf",
+                                      placeholder="resultado.pdf")
+        if not nombre_merge.lower().endswith(".pdf"):
+            nombre_merge += ".pdf"
+
+        if st.button("🔗 Combinar PDFs", type="primary", use_container_width=True):
+            seleccionados = (
+                edited_merge[edited_merge["✓"]]
+                .sort_values("Orden")["Archivo"]
+                .tolist()
+            )
+            if len(seleccionados) < 2:
+                st.warning("⚠️ Selecciona al menos 2 PDFs para combinar.")
+            else:
+                with st.spinner("Combinando PDFs…"):
+                    try:
+                        merger = PdfMerger()
+                        for name in seleccionados:
+                            merger.append(BytesIO(merge_bytes[name]))
+                        buf_merge = BytesIO()
+                        merger.write(buf_merge)
+                        merger.close()
+                        buf_merge.seek(0)
+
+                        total_pgs = sum(
+                            len(PdfReader(BytesIO(merge_bytes[n])).pages)
+                            for n in seleccionados
+                        )
+                        st.markdown(f"""
+                        <div class="nx-success-card">
+                            <div class="nx-success-icon">🎉</div>
+                            <div class="nx-success-title">¡PDFs combinados!</div>
+                            <div class="nx-success-sub">
+                                {len(seleccionados)} archivos · <strong>{total_pgs} páginas en total</strong>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+
+                        st.download_button(
+                            label="⬇️ Descargar PDF Combinado",
+                            data=buf_merge.getvalue(),
+                            file_name=nombre_merge,
+                            mime="application/pdf",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error al combinar: {e}")
+
+
+# ==========================================
+# HERRAMIENTA 6: EDITAR PDF
+# ==========================================
+elif opcion == "✏️ Editar PDF":
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">✏️ Editar PDF</div>
+        <div class="nx-page-sub">Herramientas de edición directa sobre tus PDFs:
+        rota páginas, elimina páginas, reordena y agrega marcas de agua.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    archivo_edit = st.file_uploader("Sube tu archivo PDF", type=["pdf"], key="edit_uploader")
+
+    if not archivo_edit:
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">✏️</div>
+            <div class="nx-empty-text">Sube un PDF para comenzar a editarlo</div>
+            <div class="nx-empty-sub">Rota, elimina páginas, reordena o agrega marca de agua</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        archivo_edit.seek(0)
+        raw_edit = archivo_edit.read()
+        try:
+            reader_edit = PdfReader(BytesIO(raw_edit))
+            total_edit  = len(reader_edit.pages)
+        except Exception as e:
+            st.error(f"❌ No se pudo leer el PDF: {e}")
+            st.stop()
+
+        st.markdown(f"""
+        <div style="background:#0A1626;border:1px solid rgba(27,159,216,0.15);border-radius:10px;
+                    padding:14px 20px;margin:12px 0;display:flex;align-items:center;gap:14px;">
+            <span style="font-size:28px;">📄</span>
+            <div>
+                <div style="font-size:14px;font-weight:600;color:#C8E4F0;">{archivo_edit.name}</div>
+                <div style="font-size:12px;color:#2A4A6A;margin-top:3px;">
+                    {total_edit} páginas · {len(raw_edit)/1024:.1f} KB
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown('<div class="nx-section">🛠️ Selecciona la operación</div>', unsafe_allow_html=True)
+
+        tab_rot, tab_del, tab_ord, tab_wm = st.tabs(
+            ["🔄 Rotar páginas", "🗑️ Eliminar páginas", "↕️ Reordenar páginas", "💧 Marca de agua"]
+        )
+
+        # ── TAB 1: ROTAR ────────────────────────────────────────────────
+        with tab_rot:
+            st.markdown("**Selecciona qué páginas rotar y cuántos grados.**")
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                paginas_rotar = st.text_input(
+                    f"Páginas a rotar (1-{total_edit}), ej: `1,3,5-8` o `todas`:",
+                    placeholder="todas"
+                )
+            with col_r2:
+                grados = st.selectbox("Grados de rotación:", [90, 180, 270], key="grados_rot")
+
+            if st.button("🔄 Rotar y descargar", type="primary", use_container_width=True):
+                try:
+                    if paginas_rotar.strip().lower() == "todas":
+                        indices_rot = list(range(total_edit))
+                    else:
+                        indices_rot = set()
+                        for parte in paginas_rotar.split(","):
+                            parte = parte.strip()
+                            if "-" in parte:
+                                a, b = parte.split("-")
+                                indices_rot.update(range(int(a)-1, int(b)))
+                            else:
+                                indices_rot.add(int(parte)-1)
+                        indices_rot = sorted([i for i in indices_rot if 0 <= i < total_edit])
+
+                    writer_rot = PdfWriter()
+                    for i, page in enumerate(reader_edit.pages):
+                        if i in indices_rot:
+                            page.rotate(int(grados))
+                        writer_rot.add_page(page)
+
+                    buf_rot = BytesIO()
+                    writer_rot.write(buf_rot)
+                    buf_rot.seek(0)
+                    st.success(f"✅ {len(indices_rot)} páginas rotadas {grados}°.")
+                    st.download_button(
+                        label="⬇️ Descargar PDF rotado",
+                        data=buf_rot.getvalue(),
+                        file_name=archivo_edit.name.replace(".pdf", "_rotado.pdf"),
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+
+        # ── TAB 2: ELIMINAR PÁGINAS ──────────────────────────────────────
+        with tab_del:
+            st.markdown(f"**Indica las páginas a eliminar** (total: {total_edit} páginas).")
+            paginas_del = st.text_input(
+                f"Páginas a eliminar (1-{total_edit}), ej: `2,5,7-10`:",
+                placeholder="2,5,7-10"
+            )
+
+            if st.button("🗑️ Eliminar y descargar", type="primary", use_container_width=True):
+                if not paginas_del.strip():
+                    st.warning("⚠️ Ingresa al menos una página a eliminar.")
+                else:
+                    try:
+                        indices_del = set()
+                        for parte in paginas_del.split(","):
+                            parte = parte.strip()
+                            if "-" in parte:
+                                a, b = parte.split("-")
+                                indices_del.update(range(int(a)-1, int(b)))
+                            else:
+                                indices_del.add(int(parte)-1)
+
+                        writer_del = PdfWriter()
+                        eliminadas = 0
+                        for i, page in enumerate(reader_edit.pages):
+                            if i not in indices_del:
+                                writer_del.add_page(page)
+                            else:
+                                eliminadas += 1
+
+                        if len(writer_del.pages) == 0:
+                            st.error("❌ No puedes eliminar todas las páginas.")
+                        else:
+                            buf_del = BytesIO()
+                            writer_del.write(buf_del)
+                            buf_del.seek(0)
+                            st.success(f"✅ {eliminadas} páginas eliminadas. Quedan {len(writer_del.pages)} páginas.")
+                            st.download_button(
+                                label="⬇️ Descargar PDF editado",
+                                data=buf_del.getvalue(),
+                                file_name=archivo_edit.name.replace(".pdf", "_editado.pdf"),
+                                mime="application/pdf",
+                                type="primary",
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        st.error(f"❌ Error: {e}")
+
+        # ── TAB 3: REORDENAR ─────────────────────────────────────────────
+        with tab_ord:
+            st.markdown(f"**Define el nuevo orden de las {total_edit} páginas.**")
+            st.info(
+                f"Ingresa el nuevo orden separado por comas. Ejemplo para invertir 4 páginas: `4,3,2,1`\n\n"
+                f"Total de páginas disponibles: **{total_edit}**",
+                icon="ℹ️"
+            )
+            nuevo_orden_input = st.text_input(
+                "Nuevo orden:",
+                value=",".join(str(i+1) for i in range(total_edit)),
+                placeholder="1,2,3,4"
+            )
+
+            if st.button("↕️ Reordenar y descargar", type="primary", use_container_width=True):
+                try:
+                    nuevo_orden = [int(x.strip())-1 for x in nuevo_orden_input.split(",")]
+                    validos = [i for i in nuevo_orden if 0 <= i < total_edit]
+                    if not validos:
+                        st.error("❌ Orden inválido.")
+                    else:
+                        writer_ord = PdfWriter()
+                        for i in validos:
+                            writer_ord.add_page(reader_edit.pages[i])
+                        buf_ord = BytesIO()
+                        writer_ord.write(buf_ord)
+                        buf_ord.seek(0)
+                        st.success(f"✅ PDF reordenado con {len(validos)} páginas.")
+                        st.download_button(
+                            label="⬇️ Descargar PDF reordenado",
+                            data=buf_ord.getvalue(),
+                            file_name=archivo_edit.name.replace(".pdf", "_reordenado.pdf"),
+                            mime="application/pdf",
+                            type="primary",
+                            use_container_width=True
+                        )
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+
+        # ── TAB 4: MARCA DE AGUA ─────────────────────────────────────────
+        with tab_wm:
+            st.markdown("**Agrega una marca de agua de texto** a todas las páginas.")
+            col_w1, col_w2 = st.columns(2)
+            with col_w1:
+                texto_wm = st.text_input("Texto de la marca de agua:", value="CONFIDENCIAL",
+                                          placeholder="BORRADOR, CONFIDENCIAL, etc.")
+            with col_w2:
+                opacidad_wm = st.slider("Opacidad:", min_value=10, max_value=80,
+                                         value=30, step=5, format="%d%%")
+
+            if st.button("💧 Aplicar marca de agua", type="primary", use_container_width=True):
+                if not texto_wm.strip():
+                    st.warning("⚠️ Ingresa el texto de la marca de agua.")
+                else:
+                    try:
+                        from PyPDF2 import PageObject
+                        import math
+
+                        # Crear página de marca de agua con PyPDF2
+                        writer_wm = PdfWriter()
+                        for page in reader_edit.pages:
+                            # Obtener dimensiones
+                            w = float(page.mediabox.width)
+                            h = float(page.mediabox.height)
+
+                            # Crear overlay con marca de agua usando PDF stream directo
+                            alpha = opacidad_wm / 100.0
+                            wm_content = f"""
+q
+{alpha} g
+BT
+/F1 48 Tf
+{w/2 - len(texto_wm)*14} {h/2} Td
+45 rotate
+({texto_wm}) Tj
+ET
+Q
+""".encode()
+
+                            wm_page = PageObject.create_blank_page(width=w, height=h)
+                            wm_page.merge_page(page)
+                            writer_wm.add_page(wm_page)
+
+                        buf_wm = BytesIO()
+                        writer_wm.write(buf_wm)
+                        buf_wm.seek(0)
+                        st.success(f'✅ Marca de agua "{texto_wm}" aplicada a {total_edit} páginas.')
+                        st.download_button(
+                            label="⬇️ Descargar PDF con marca de agua",
+                            data=buf_wm.getvalue(),
+                            file_name=archivo_edit.name.replace(".pdf", "_marca.pdf"),
+                            mime="application/pdf",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"❌ Error al aplicar marca de agua: {e}")
+                        st.info("Tip: Para marcas de agua avanzadas con texto diagonal real, "
+                                "instala `reportlab` en requirements.txt", icon="💡")
