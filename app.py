@@ -225,7 +225,8 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
     # ── Session state ──────────────────────────────────────────────────────
     for _k, _v in [("nx_done", False), ("nx_buffer", None),
                    ("nx_nombre", "Documento_Unificado.pdf"),
-                   ("nx_order", []), ("nx_files_sig", "")]:
+                   ("nx_order", []), ("nx_files_sig", ""),
+                   ("nx_editor_ver", 0)]:
         if _k not in st.session_state:
             st.session_state[_k] = _v
 
@@ -336,7 +337,7 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
 
     # ── Title ──────────────────────────────────────────────────────────────
     st.title("📄🔗📄 Nexíficar PDFs")
-    st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, con previsualización de la primera página y reordenamiento con botones ↑ ↓ sobre cada tarjeta.")
+    st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, con previsualización de miniatura y reordenamiento rápido por número de posición.")
 
     # ── File uploader ──────────────────────────────────────────────────────
     st.markdown('<div class="nx-section">📂 Paso 1 — Subir PDFs</div>', unsafe_allow_html=True)
@@ -405,69 +406,97 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
         orden = st.session_state.nx_order
 
         if not st.session_state.nx_done:
-            # ── Card grid with ↑ ↓ ✕ buttons (Paso 2) ───────────────────
+            # ── Tabla de orden editable (Paso 2) ─────────────────────────
             st.markdown(
-                '<div class="nx-section">↕️ Paso 2 — Ordena los PDFs con los botones ↑ ↓</div>',
+                '<div class="nx-section">📋 Paso 2 — Ajusta el orden y selecciona los PDFs</div>',
                 unsafe_allow_html=True
             )
+            st.info(
+                "Edita los números de la columna **Orden** para cambiar la posición de cada PDF. "
+                "Desmarca **✓** para excluir un archivo del resultado final. "
+                "Cuando termines, pulsa **Aplicar orden**.",
+                icon="ℹ️"
+            )
 
-            CARDS_PER_ROW = 4
-            n_total = len(orden)
+            # Construir dataframe desde el orden actual
+            order_df = pd.DataFrame([
+                {
+                    "Orden":   i + 1,
+                    "✓":       True,
+                    "Archivo": name,
+                    "Páginas": str(file_info_map[name]["pages"]),
+                    "Tamaño":  file_info_map[name]["size"],
+                }
+                for i, name in enumerate(orden)
+            ])
 
-            for row_start in range(0, n_total, CARDS_PER_ROW):
-                row_slice = orden[row_start : row_start + CARDS_PER_ROW]
-                cols = st.columns(CARDS_PER_ROW)
-                for col_offset, name in enumerate(row_slice):
-                    fi  = file_info_map[name]
-                    idx = row_start + col_offset
-                    with cols[col_offset]:
-                        with st.container(border=True):
-                            # Thumbnail or placeholder
-                            if fi["thumb"]:
-                                st.image(
-                                    base64.b64decode(fi["thumb"]),
-                                    use_container_width=True
-                                )
-                            else:
+            edited_df = st.data_editor(
+                order_df,
+                column_config={
+                    "Orden":   st.column_config.NumberColumn(
+                                   "Orden", min_value=1, max_value=len(orden),
+                                   step=1, width="small"),
+                    "✓":       st.column_config.CheckboxColumn("✓", width="small"),
+                    "Archivo": st.column_config.TextColumn("Archivo", disabled=True),
+                    "Páginas": st.column_config.TextColumn("Páginas", disabled=True, width="small"),
+                    "Tamaño":  st.column_config.TextColumn("Tamaño",  disabled=True, width="small"),
+                },
+                hide_index=True,
+                use_container_width=True,
+                key=f"order_editor_{st.session_state.nx_editor_ver}",
+            )
+
+            if st.button("↺ Aplicar orden", use_container_width=True):
+                nuevos = (
+                    edited_df[edited_df["✓"]]
+                    .sort_values("Orden")["Archivo"]
+                    .tolist()
+                )
+                if not nuevos:
+                    st.warning("⚠️ Debes incluir al menos un PDF.")
+                else:
+                    st.session_state.nx_order      = nuevos
+                    st.session_state.nx_editor_ver += 1
+                    st.rerun()
+
+            # ── Vista previa de miniaturas en el orden actual ─────────────
+            if orden:
+                st.markdown(
+                    '<div class="nx-section">🖼️ Vista previa del orden actual</div>',
+                    unsafe_allow_html=True
+                )
+                CARDS_PER_ROW = 4
+                for row_start in range(0, len(orden), CARDS_PER_ROW):
+                    row_slice = orden[row_start : row_start + CARDS_PER_ROW]
+                    cols = st.columns(CARDS_PER_ROW)
+                    for col_offset, name in enumerate(row_slice):
+                        fi  = file_info_map[name]
+                        idx = row_start + col_offset
+                        with cols[col_offset]:
+                            with st.container(border=True):
+                                if fi["thumb"]:
+                                    st.image(
+                                        base64.b64decode(fi["thumb"]),
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.markdown(
+                                        '<div style="background:#0D1E30;border-radius:8px;'
+                                        'height:100px;display:flex;align-items:center;'
+                                        'justify-content:center;font-size:34px;">📄</div>',
+                                        unsafe_allow_html=True
+                                    )
+                                short = (fi["name"][:22] + "…") if len(fi["name"]) > 22 else fi["name"]
                                 st.markdown(
-                                    '<div style="background:#0D1E30;border-radius:8px;'
-                                    'height:110px;display:flex;align-items:center;'
-                                    'justify-content:center;font-size:38px;">📄</div>',
+                                    f'<div style="font-size:12px;font-weight:600;color:#C8E8DF;'
+                                    f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                                    f'margin:5px 0 2px 0;">'
+                                    f'<span style="background:#1D9E75;color:#fff;border-radius:50%;'
+                                    f'padding:1px 7px;margin-right:5px;font-size:11px;'
+                                    f'font-weight:700;">{idx + 1}</span>{short}</div>',
                                     unsafe_allow_html=True
                                 )
-
-                            # Order badge + truncated filename
-                            short = (fi["name"][:22] + "…") if len(fi["name"]) > 22 else fi["name"]
-                            st.markdown(
-                                f'<div style="font-size:12px;font-weight:600;color:#C8E8DF;'
-                                f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
-                                f'margin:6px 0 2px 0;">'
-                                f'<span style="background:#1D9E75;color:#fff;border-radius:50%;'
-                                f'padding:1px 7px;margin-right:5px;font-size:11px;font-weight:700;">'
-                                f'{idx + 1}</span>{short}</div>',
-                                unsafe_allow_html=True
-                            )
-                            st.caption(f"📄 {fi['pages']} pág. · 💾 {fi['size']}")
-
-                            # Control buttons: ↑  ↓  ✕
-                            b_up, b_dn, b_del = st.columns(3)
-                            with b_up:
-                                if st.button("↑", key=f"up_{idx}",
-                                             disabled=(idx == 0),
-                                             use_container_width=True):
-                                    orden[idx], orden[idx - 1] = orden[idx - 1], orden[idx]
-                                    st.rerun()
-                            with b_dn:
-                                if st.button("↓", key=f"dn_{idx}",
-                                             disabled=(idx == n_total - 1),
-                                             use_container_width=True):
-                                    orden[idx], orden[idx + 1] = orden[idx + 1], orden[idx]
-                                    st.rerun()
-                            with b_del:
-                                if st.button("✕", key=f"dl_{idx}",
-                                             use_container_width=True):
-                                    orden.pop(idx)
-                                    st.rerun()
+                                st.caption(f"📄 {fi['pages']} pág. · 💾 {fi['size']}")
 
             # ── File name ─────────────────────────────────────────────────
             st.markdown('<div class="nx-section">💾 Nombre del PDF final</div>',
@@ -527,8 +556,9 @@ elif opcion == "📄🔗📄 Nexíficar PDFs":
 
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🔄 Nexíficar otros PDFs", use_container_width=True):
-                st.session_state.nx_done      = False
-                st.session_state.nx_buffer    = None
-                st.session_state.nx_order     = []
-                st.session_state.nx_files_sig = ""
+                st.session_state.nx_done       = False
+                st.session_state.nx_buffer     = None
+                st.session_state.nx_order      = []
+                st.session_state.nx_files_sig  = ""
+                st.session_state.nx_editor_ver = 0
                 st.rerun()
