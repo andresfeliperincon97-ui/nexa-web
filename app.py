@@ -3,6 +3,7 @@ import pandas as pd
 import zipfile
 import os
 import tempfile
+import base64
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from io import BytesIO
 
@@ -26,36 +27,31 @@ if ruta_logo:
             st.image(ruta_logo, use_container_width=True)
         st.markdown("---")
     except Exception:
-        pass 
+        pass
 
 # ==========================================
 # SISTEMA DE SEGURIDAD (EL CADENERO)
 # ==========================================
-# Si el usuario no está validado, le mostramos la pantalla de inicio de sesión
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
 
 if not st.session_state.autenticado:
     st.markdown("<h3 style='text-align: center;'>🔒 Acceso Restringido</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Por favor, ingresa tu código de acceso para entrar a la plataforma.</p>", unsafe_allow_html=True)
-    
+
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         password = st.text_input("Contraseña / ID de acceso:", type="password")
         if st.button("Entrar", type="primary", use_container_width=True):
             try:
-                # Extraemos todas las contraseñas válidas de tu bóveda secreta
                 claves_validas = list(st.secrets["accesos"].values())
-                
                 if password in claves_validas:
                     st.session_state.autenticado = True
-                    st.rerun() # Recarga la página ya estando adentro
+                    st.rerun()
                 else:
                     st.error("❌ Código incorrecto o inactivo. Intenta de nuevo.")
             except Exception:
                 st.warning("⚠️ La bóveda de contraseñas no ha sido configurada correctamente en Streamlit.")
-    
-    # Detenemos todo el código aquí para que no se muestre nada más hasta que pongan la clave
     st.stop()
 
 
@@ -66,17 +62,17 @@ st.sidebar.title("🛠️ Automatizaciones NEXA")
 st.sidebar.markdown("Elige el proceso que necesitas:")
 opcion = st.sidebar.radio(
     "",
-    ("🗂️ Nexificar PDFs Masivamente", "📄🔗📄 Nexificar PDFs")
+    ("🗂️ Nexíficar PDFs Masivamente", "📄🔗📄 Nexíficar PDFs")
 )
 
 st.sidebar.markdown("---")
 st.sidebar.info("🔒 **100% Privado:** Los documentos procesados aquí no se guardan en ningún servidor externo.")
 
 # ==========================================
-# HERRAMIENTA 1: NEXIFICAR MASIVAMENTE
+# HERRAMIENTA 1: NEXÍFICAR MASIVAMENTE
 # ==========================================
-if opcion == "🗂️ Nexificar PDFs Masivamente":
-    st.title("🗂️ Nexificar PDFs Masivamente")
+if opcion == "🗂️ Nexíficar PDFs Masivamente":
+    st.title("🗂️ Nexíficar PDFs Masivamente")
     st.markdown("Ensambla cientos de expedientes al mismo tiempo usando tu **Plantilla de Excel** y archivos **ZIP**, o simplemente utilízalo para **renombrar** tus documentos de forma automática.")
 
     st.markdown("---")
@@ -97,7 +93,6 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
             p, pos = inst.split(':')
             try: pos_final = int(pos)
             except: continue
-            
             if p.lower() == 'completo': parsed.append(('completo', pos_final))
             elif '-' in p:
                 try: parsed.append((list(range(int(p.split('-')[0])-1, int(p.split('-')[1]))), pos_final))
@@ -110,41 +105,41 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
                 except: pass
         return parsed
 
-    if st.button("Nexificar Documentos Masivamente", type="primary", use_container_width=True):
+    if st.button("Nexíficar Documentos Masivamente", type="primary", use_container_width=True):
         if not archivo_excel or not archivos_zip:
             st.warning("⚠️ Por favor, sube el Excel y al menos un archivo ZIP para comenzar.")
         else:
-            with st.spinner('Nexificando documentos mágicamente... Esto puede tomar unos segundos.'):
+            with st.spinner('Nexíficando documentos mágicamente... Esto puede tomar unos segundos.'):
                 with tempfile.TemporaryDirectory() as temp_dir:
                     ruta_origen = os.path.join(temp_dir, 'origen')
                     ruta_salida = os.path.join(temp_dir, 'salida')
                     os.makedirs(ruta_origen)
                     os.makedirs(ruta_salida)
-                    
+
                     for zip_file in archivos_zip:
                         with zipfile.ZipFile(zip_file, 'r') as z:
                             z.extractall(ruta_origen)
-                    
+
                     try:
                         df = pd.read_excel(archivo_excel)
                         columnas_archivo = [col for col in df.columns if str(col).startswith('Archivo_')]
-                        
+
                         if 'Nombre_Salida' not in df.columns:
                             st.error("❌ El Excel debe tener una columna llamada 'Nombre_Salida'.")
                         else:
                             barra = st.progress(0)
                             exitos = 0
                             errores = []
-                            
+
                             for idx, row in df.iterrows():
                                 nombre_salida = str(row['Nombre_Salida']).strip()
                                 if pd.isna(nombre_salida) or nombre_salida == 'nan' or not nombre_salida: continue
                                 if not nombre_salida.lower().endswith('.pdf'): nombre_salida += '.pdf'
-                                
+
                                 ruta_final = os.path.join(ruta_salida, nombre_salida)
                                 max_pos = 0
                                 docs_a_procesar = []
-                                
+
                                 for col_arch in columnas_archivo:
                                     num_index = col_arch.split('_')[1]
                                     col_inst = f'Instrucciones_{num_index}'
@@ -155,11 +150,11 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
                                             parsed = parse_paginas(instrucciones)
                                             for _, pos in parsed: max_pos = max(max_pos, pos)
                                             docs_a_procesar.append((nombre_doc, parsed))
-                                
+
                                 if max_pos > 0:
                                     paginas_pos = [[] for _ in range(max_pos + 1)]
                                     error_fila = False
-                                    
+
                                     for n_doc, p_inst in docs_a_procesar:
                                         r_doc = buscar_archivo_en_dir(n_doc, ruta_origen)
                                         if not r_doc:
@@ -178,7 +173,7 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
                                             errores.append(f"Error leyendo '{n_doc}': {e}")
                                             error_fila = True
                                             break
-                                    
+
                                     if not error_fila:
                                         writer = PdfWriter()
                                         for pos_idx in range(1, max_pos + 1):
@@ -186,17 +181,17 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
                                         if len(writer.pages) > 0:
                                             with open(ruta_final, "wb") as f: writer.write(f)
                                             exitos += 1
-                                            
+
                                 barra.progress((idx + 1) / len(df))
-                            
+
                             if exitos > 0:
-                                st.success(f"🎉 ¡Proceso finalizado! Se nexificaron {exitos} documentos con éxito.")
-                                
+                                st.success(f"🎉 ¡Proceso finalizado! Se nexíficaron {exitos} documentos con éxito.")
+
                                 zip_final = os.path.join(temp_dir, 'NEXA_Resultados.zip')
                                 with zipfile.ZipFile(zip_final, 'w') as z:
                                     for r, _, archs in os.walk(ruta_salida):
                                         for a in archs: z.write(os.path.join(r, a), a)
-                                        
+
                                 with open(zip_final, "rb") as fp:
                                     st.download_button(
                                         label="⬇️ Descargar Resultados (ZIP)",
@@ -207,7 +202,7 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
                                     )
                             else:
                                 st.error("No se pudo generar ningún documento. Revisa tu Excel y que los PDFs existan.")
-                                
+
                             if errores:
                                 with st.expander("⚠️ Ver detalles de advertencias"):
                                     for err in set(errores): st.write(err)
@@ -215,60 +210,311 @@ if opcion == "🗂️ Nexificar PDFs Masivamente":
                     except Exception as e:
                         st.error(f"❌ Error leyendo el Excel: {e}")
 
-# ==========================================
-# HERRAMIENTA 2: NEXIFICAR PDFs
-# ==========================================
-elif opcion == "📄🔗📄 Nexificar PDFs":
-    st.title("📄🔗📄 Nexificar PDFs")
-    st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, eligiendo el orden exacto.")
 
-    st.markdown("---")
-    archivos_subidos = st.file_uploader("📄 1. Sube todos los PDFs que quieras unir (Selecciona varios a la vez)", type=["pdf"], accept_multiple_files=True)
-    
-    if archivos_subidos:
-        nombres_archivos = [archivo.name for archivo in archivos_subidos]
-        diccionario_archivos = {archivo.name: archivo for archivo in archivos_subidos}
-        
-        st.markdown("### 2. Selecciona el orden")
-        st.info("💡 Haz clic en la caja de abajo y selecciona los archivos **en el orden en el que quieres que se unan**.")
-        
-        orden_seleccionado = st.multiselect("Orden final de los documentos:", nombres_archivos)
-        
-        st.markdown("### 3. Nombre del archivo final")
-        nombre_final = st.text_input("¿Cómo quieres que se llame el PDF unificado?", "Documento_Unificado.pdf")
-        if not nombre_final.lower().endswith(".pdf"):
-            nombre_final += ".pdf"
-            
-        st.markdown("---")
-        
-        if st.button("Nexificar PDFs Ahora", type="primary", use_container_width=True):
-            if not orden_seleccionado:
-                st.warning("⚠️ Debes seleccionar al menos un documento para unir.")
+# ==========================================
+# HERRAMIENTA 2: NEXÍFICAR PDFs
+# ==========================================
+elif opcion == "📄🔗📄 Nexíficar PDFs":
+
+    try:
+        import fitz
+        FITZ_OK = True
+    except ImportError:
+        FITZ_OK = False
+
+    try:
+        from streamlit_sortables import sort_items
+        SORT_OK = True
+    except ImportError:
+        SORT_OK = False
+
+    # ── Session state ──────────────────────────────────────────────────────
+    for _k, _v in [("nx_done", False), ("nx_buffer", None), ("nx_nombre", "Documento_Unificado.pdf")]:
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    # ── CSS ────────────────────────────────────────────────────────────────
+    st.markdown("""
+    <style>
+    /* ======== STEP BAR ======== */
+    .nx-steps {
+        display: flex; align-items: center; justify-content: center;
+        padding: 10px 0 28px 0;
+    }
+    .nx-step {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 6px; min-width: 95px;
+    }
+    .nx-circle {
+        width: 44px; height: 44px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px; font-weight: 700; transition: all .3s;
+    }
+    .nx-circle.done   { background: #1D9E75; color: #fff; box-shadow: 0 0 16px rgba(29,158,117,.6); }
+    .nx-circle.active { background: #1D9E75; color: #fff; box-shadow: 0 0 24px rgba(29,158,117,.8); }
+    .nx-circle.idle   { background: #0A1826; color: #3A6A8C; border: 2px solid #1A3A5C; }
+    .nx-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #3A6A8C; }
+    .nx-label.active, .nx-label.done { color: #1D9E75; }
+    .nx-line {
+        flex: 1; height: 3px; max-width: 72px; border-radius: 2px;
+        margin-bottom: 20px; transition: background .3s;
+    }
+    .nx-line.done { background: #1D9E75; }
+    .nx-line.idle { background: #1A3A5C; }
+
+    /* ======== PDF CARDS ======== */
+    .nx-card {
+        background: #0A1826; border: 2px solid #1A3A5C; border-radius: 14px;
+        padding: 14px; position: relative; transition: all .25s;
+        margin-bottom: 4px;
+    }
+    .nx-card:hover {
+        border-color: #1D9E75;
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(29,158,117,.28);
+    }
+    .nx-thumb { width: 100%; border-radius: 8px; display: block; margin-bottom: 10px; }
+    .nx-thumb-icon {
+        width: 100%; min-height: 130px; border-radius: 8px;
+        background: linear-gradient(135deg, #0D1E30 0%, #162840 100%);
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 10px; font-size: 46px;
+    }
+    .nx-fname {
+        font-size: 13px; font-weight: 600; color: #C8E8DF;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        margin-bottom: 8px;
+    }
+    .nx-meta { display: flex; gap: 7px; flex-wrap: wrap; }
+    .nx-badge {
+        font-size: 11px; color: #4ABFA0; background: #050E19;
+        border: 1px solid #1A3A5C; border-radius: 20px; padding: 2px 9px;
+    }
+
+    /* ======== SECTION HEADER ======== */
+    .nx-section {
+        font-size: 12px; font-weight: 700; color: #1D9E75;
+        text-transform: uppercase; letter-spacing: 1.1px;
+        margin: 24px 0 12px 0; display: flex; align-items: center; gap: 10px;
+    }
+    .nx-section::after {
+        content: ''; flex: 1; height: 1px;
+        background: linear-gradient(90deg, #1D9E75 0%, transparent 100%);
+    }
+
+    /* ======== NEXÍFICAR BUTTON ======== */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #1D9E75 0%, #14835D 100%) !important;
+        border: none !important; color: #fff !important;
+        border-radius: 10px !important; font-size: 17px !important;
+        font-weight: 700 !important; letter-spacing: .4px !important;
+        box-shadow: 0 4px 20px rgba(29,158,117,.45) !important;
+        transition: all .2s !important;
+    }
+    button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #22B587 0%, #1AAD6E 100%) !important;
+        box-shadow: 0 6px 28px rgba(29,158,117,.65) !important;
+        transform: translateY(-2px) !important;
+    }
+    button[kind="primary"]:active { transform: translateY(0px) !important; }
+
+    /* ======== EMPTY STATE ======== */
+    .nx-empty {
+        text-align: center; padding: 48px 24px;
+        background: #071420; border-radius: 16px;
+        border: 2px dashed #1A3A5C; margin-top: 14px;
+    }
+    .nx-empty-icon { font-size: 54px; margin-bottom: 14px; }
+    .nx-empty-text { font-size: 16px; color: #3A6A8C; }
+    .nx-empty-sub  { font-size: 13px; color: #1A3A5C; margin-top: 8px; }
+
+    /* ======== SUCCESS CARD ======== */
+    .nx-success-card {
+        background: linear-gradient(135deg, #071F14 0%, #0A2B1C 100%);
+        border: 2px solid #1D9E75; border-radius: 16px;
+        padding: 28px; text-align: center; margin: 16px 0;
+    }
+    .nx-success-icon { font-size: 52px; margin-bottom: 10px; }
+    .nx-success-title { font-size: 20px; font-weight: 700; color: #1D9E75; margin-bottom: 6px; }
+    .nx-success-sub   { font-size: 14px; color: #4ABFA0; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── Helpers ────────────────────────────────────────────────────────────
+    def _render_steps(step):
+        cfg = [("1", "Subir PDFs"), ("2", "Ordenar"), ("3", "Unificar")]
+        html = '<div class="nx-steps">'
+        for i, (num, lbl) in enumerate(cfg):
+            if   i + 1 < step:  cs, ls, ic = "done",   "done",   "✓"
+            elif i + 1 == step: cs, ls, ic = "active", "active", num
+            else:                cs, ls, ic = "idle",   "",       num
+            html += (f'<div class="nx-step">'
+                     f'<div class="nx-circle {cs}">{ic}</div>'
+                     f'<span class="nx-label {ls}">{lbl}</span>'
+                     f'</div>')
+            if i < len(cfg) - 1:
+                html += f'<div class="nx-line {"done" if i+2<=step else "idle"}"></div>'
+        return html + '</div>'
+
+    def _get_thumb(pdf_bytes):
+        if not FITZ_OK:
+            return None
+        try:
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            pix = doc[0].get_pixmap(matrix=fitz.Matrix(1.2, 1.2), alpha=False)
+            return base64.b64encode(pix.tobytes("png")).decode()
+        except Exception:
+            return None
+
+    # ── Title ──────────────────────────────────────────────────────────────
+    st.title("📄🔗📄 Nexíficar PDFs")
+    st.markdown("Sube varios PDFs sueltos y únelos en **un solo archivo**, con previsualización de la primera página y reordenamiento por *drag & drop*.")
+
+    # ── File uploader (Paso 1) ─────────────────────────────────────────────
+    st.markdown('<div class="nx-section">📂 Paso 1 — Subir PDFs</div>', unsafe_allow_html=True)
+    archivos_subidos = st.file_uploader(
+        "Selecciona o arrastra tus archivos PDF aquí",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
+
+    # Reset state if user clears files
+    if not archivos_subidos:
+        st.session_state.nx_done   = False
+        st.session_state.nx_buffer = None
+
+    # Current step
+    step = 1 if not archivos_subidos else (3 if st.session_state.nx_done else 2)
+    st.markdown(_render_steps(step), unsafe_allow_html=True)
+
+    # ── Empty state ────────────────────────────────────────────────────────
+    if not archivos_subidos:
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">📂</div>
+            <div class="nx-empty-text">Usa el selector de arriba para cargar tus PDFs</div>
+            <div class="nx-empty-sub">Puedes seleccionar múltiples archivos a la vez</div>
+        </div>""", unsafe_allow_html=True)
+
+    # ── Paso 2 & 3: tarjetas + orden + Nexíficar ───────────────────────────
+    else:
+        # Build metadata for each uploaded file
+        file_info = []
+        for arch in archivos_subidos:
+            arch.seek(0)
+            raw = arch.read()
+            arch.seek(0)
+            try:
+                pages = len(PdfReader(BytesIO(raw)).pages)
+            except Exception:
+                pages = "?"
+            kb = len(raw) / 1024
+            sz = f"{kb:.1f} KB" if kb < 1024 else f"{kb/1024:.1f} MB"
+            file_info.append({
+                "arch":  arch,
+                "name":  arch.name,
+                "raw":   raw,
+                "pages": pages,
+                "size":  sz,
+                "thumb": _get_thumb(raw),
+            })
+
+        # ── Cards grid (Paso 2) ────────────────────────────────────────────
+        st.markdown('<div class="nx-section">📋 Paso 2 — PDFs cargados</div>', unsafe_allow_html=True)
+        ncols = min(3, len(file_info))
+        for i in range(0, len(file_info), ncols):
+            batch = file_info[i:i + ncols]
+            cols  = st.columns(ncols)
+            for j, info in enumerate(batch):
+                with cols[j]:
+                    if info["thumb"]:
+                        img_html = (f'<img class="nx-thumb" '
+                                    f'src="data:image/png;base64,{info["thumb"]}"/>')
+                    else:
+                        img_html = '<div class="nx-thumb-icon">📄</div>'
+                    sname = (info["name"][:25] + "…") if len(info["name"]) > 25 else info["name"]
+                    st.markdown(f"""
+                    <div class="nx-card">
+                        {img_html}
+                        <div class="nx-fname" title="{info['name']}">{sname}</div>
+                        <div class="nx-meta">
+                            <span class="nx-badge">📄 {info['pages']} pág.</span>
+                            <span class="nx-badge">💾 {info['size']}</span>
+                        </div>
+                    </div>""", unsafe_allow_html=True)
+
+        # ── Order + Button (solo si aún no se ha Nexíficado) ──────────────
+        if not st.session_state.nx_done:
+            nombres    = [fi["name"] for fi in file_info]
+            dict_arch  = {fi["name"]: fi["arch"] for fi in file_info}
+
+            # Drag & drop ordering
+            st.markdown('<div class="nx-section">↕️ Paso 2 — Ordenar (arrastra para reordenar)</div>',
+                        unsafe_allow_html=True)
+            if SORT_OK:
+                st.caption("Arrastra los elementos para definir el orden de unión:")
+                orden = sort_items(nombres, direction="vertical")
             else:
-                with st.spinner("Nexificando documentos conservando la calidad original..."):
-                    try:
-                        fusionador = PdfMerger()
-                        
-                        for nombre in orden_seleccionado:
-                            archivo_actual = diccionario_archivos[nombre]
-                            archivo_actual.seek(0)
-                            fusionador.append(archivo_actual)
-                        
-                        buffer_salida = BytesIO()
-                        fusionador.write(buffer_salida)
-                        fusionador.close()
-                        
-                        buffer_salida.seek(0)
-                        
-                        st.success(f"✅ ¡Documento '{nombre_final}' creado con éxito!")
-                        
-                        st.download_button(
-                            label="⬇️ Descargar PDF Unificado",
-                            data=buffer_salida,
-                            file_name=nombre_final,
-                            mime="application/pdf",
-                            type="primary"
-                        )
-                        
-                    except Exception as e:
-                        st.error(f"❌ Ocurrió un error al unir los archivos: {e}")
+                st.info("💡 Selecciona los archivos **en el orden** en que quieres unirlos:")
+                orden = st.multiselect("Orden final de los documentos:", nombres, default=nombres)
+
+            # Output file name
+            st.markdown('<div class="nx-section">💾 Nombre del PDF final</div>', unsafe_allow_html=True)
+            nombre_final = st.text_input(
+                "Nombre del archivo unificado:",
+                "Documento_Unificado.pdf",
+                label_visibility="collapsed"
+            )
+            if not nombre_final.lower().endswith(".pdf"):
+                nombre_final += ".pdf"
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # ── NEXÍFICAR BUTTON ───────────────────────────────────────────
+            if st.button(f"🔗 Nexíficar {len(nombres)} PDFs", type="primary", use_container_width=True):
+                if not orden:
+                    st.warning("⚠️ Selecciona al menos un documento para unir.")
+                else:
+                    with st.spinner("Nexíficando documentos conservando la calidad original..."):
+                        try:
+                            merger = PdfMerger()
+                            for n in orden:
+                                a = dict_arch[n]
+                                a.seek(0)
+                                merger.append(a)
+                            buf = BytesIO()
+                            merger.write(buf)
+                            merger.close()
+                            buf.seek(0)
+                            st.session_state.nx_buffer = buf.getvalue()
+                            st.session_state.nx_nombre = nombre_final
+                            st.session_state.nx_done   = True
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Error al unir los archivos: {e}")
+
+        # ── Paso 3: Éxito + Descarga ───────────────────────────────────────
+        else:
+            total = len(file_info)
+            st.markdown(f"""
+            <div class="nx-success-card">
+                <div class="nx-success-icon">🎉</div>
+                <div class="nx-success-title">¡Nexíficación completada!</div>
+                <div class="nx-success-sub">{total} PDF{'s' if total != 1 else ''} unidos en
+                <strong>{st.session_state.nx_nombre}</strong></div>
+            </div>""", unsafe_allow_html=True)
+
+            st.download_button(
+                label="⬇️ Descargar PDF Unificado",
+                data=st.session_state.nx_buffer,
+                file_name=st.session_state.nx_nombre,
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 Nexíficar otros PDFs", use_container_width=True):
+                st.session_state.nx_done   = False
+                st.session_state.nx_buffer = None
+                st.rerun()
