@@ -3,4 +3,3 @@ pandas
 PyPDF2
 openpyxl
 PyMuPDF
-streamlit-sortables
