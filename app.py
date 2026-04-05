@@ -527,8 +527,8 @@ body { background: #0A1626; font-family: -apple-system, BlinkMacSystemFont, "Seg
 #save-btn { background: #1B9FD8; border: none; color: #fff; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; margin-left: auto; white-space: nowrap; }
 #save-btn:hover { background: #1489BD; }
 #del-btn { background: #C0392B; border: none; color: #fff; border-radius: 5px; padding: 3px 8px; font-size: 12px; cursor: pointer; display: none; }
-#cvwrap { position: relative; overflow: hidden; width: 100%; }
-canvas { display: block; max-width: 100%; }
+#cvwrap { position: relative; overflow: auto; width: 100%; }
+canvas { display: block; }
 #status { font-size: 10px; color: #2A4A6A; padding: 2px 8px; min-height: 16px; }
 </style>
 </head>
@@ -549,6 +549,10 @@ canvas { display: block; max-width: 100%; }
   <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;color:#C8E4F0;">
     <input type="checkbox" id="useFill" style="accent-color:#1B9FD8;cursor:pointer"> Relleno s&oacute;lido
   </label>
+  <div class="sep"></div>
+  <button class="tb-btn" onclick="zoomOut()">&#128269;-</button>
+  <span id="zoom-lbl" style="font-size:11px;color:#C8E4F0;white-space:nowrap;min-width:36px;text-align:center;">100%</span>
+  <button class="tb-btn" onclick="zoomIn()">&#128269;+</button>
   <button id="save-btn" onclick="saveDat()">&#128190; Guardar</button>
 </div>
 <div id="tb2">
@@ -571,12 +575,13 @@ canvas { display: block; max-width: 100%; }
   <button onclick="commitTxt()" style="background:#1B9FD8;border:none;color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Agregar</button>
   <button onclick="cancelTxt()" style="background:#0A1626;border:1px solid #1B4060;color:#C8E4F0;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer;">&#10005;</button>
 </div>
-<div id="cvwrap" style="width:100%;overflow:hidden;">
-  <canvas id="cv" width="___CW___" height="___CH___" style="width:100%;display:block;"></canvas>
+<div id="cvwrap" style="width:100%;overflow:auto;">
+  <canvas id="cv" width="___CW___" height="___CH___" style="display:block;transform-origin:top left;"></canvas>
 </div>
 <div id="status">Herramienta: Mover/Seleccionar</div>
 <script>
-var CW=___CW___,CH=___CH___,HR=5;
+var CW=___CW___,CH=___CH___,HR=4;
+var zoom=1,ZOOMS=[0.5,0.75,1,1.25,1.5];
 var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 var els=___INIT___;
 var tool='tf',sel=-1,drag=null,drawing=null;
@@ -677,7 +682,7 @@ function gH(e){
 }
 function hitH(e,mx,my){
   var hs=gH(e);
-  for(var i=0;i<hs.length;i++) if(Math.hypot(mx-hs[i].x,my-hs[i].y)<=HR+3) return hs[i];
+  for(var i=0;i<hs.length;i++){ var h=hs[i]; if(Math.abs(mx-h.x)<=5&&Math.abs(my-h.y)<=5) return h; }
   return null;
 }
 function hitE(e,mx,my){
@@ -730,9 +735,10 @@ function dE(e,isSel,isDraft){
     ctx.setLineDash([]);
     var hs=gH(e);
     for(var i=0;i<hs.length;i++){
-      ctx.beginPath(); ctx.arc(hs[i].x,hs[i].y,HR,0,Math.PI*2);
-      ctx.fillStyle='#1B9FD8'; ctx.fill();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+      if(hs[i].id==='mc') continue;
+      var hx=hs[i].x,hy=hs[i].y,hs2=3;
+      ctx.fillStyle='#1B9FD8'; ctx.fillRect(hx-hs2,hy-hs2,hs2*2,hs2*2);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.strokeRect(hx-hs2,hy-hs2,hs2*2,hs2*2);
     }
     ctx.restore();
   }
@@ -756,9 +762,19 @@ function draw(){
 
 // Init text measurements
 for(var _i=0;_i<els.length;_i++){ if(els[_i].type==='text') remeas(els[_i]); }
+applyZoom();
 
 // ── XY helper ──────────────────────────────────────────────────────────────
-function xy(e){ var r=cv.getBoundingClientRect(); return{x:(e.clientX-r.left)*(CW/r.width),y:(e.clientY-r.top)*(CH/r.height)}; }
+function xy(e){ var r=cv.getBoundingClientRect(); return{x:(e.clientX-r.left)/zoom*(CW/r.width),y:(e.clientY-r.top)/zoom*(CH/r.height)}; }
+function applyZoom(){
+  cv.style.transform='scale('+zoom+')';
+  cv.style.transformOrigin='top left';
+  cv.style.width=(CW*zoom)+'px';
+  document.getElementById('cvwrap').style.height=(CH*zoom)+'px';
+  document.getElementById('zoom-lbl').textContent=Math.round(zoom*100)+'%';
+}
+function zoomIn(){ var zi=ZOOMS.indexOf(zoom); if(zi<ZOOMS.length-1){ zoom=ZOOMS[zi+1]; applyZoom(); } }
+function zoomOut(){ var zi=ZOOMS.indexOf(zoom); if(zi>0){ zoom=ZOOMS[zi-1]; applyZoom(); } }
 
 // ── Mouse down ─────────────────────────────────────────────────────────────
 cv.addEventListener('mousedown',function(e){
