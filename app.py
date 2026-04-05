@@ -496,7 +496,7 @@ _CANVAS_TMPL = """<!DOCTYPE html>
 <meta charset="utf-8">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0A1626; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; user-select: none; }
+body { background: #0A1626; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow: hidden; overflow-x: hidden; user-select: none; margin: 0; padding: 0; }
 #tb1, #tb2 {
   display: flex; align-items: center; gap: 5px; padding: 5px 8px;
   background: #0E1E30; flex-wrap: wrap; min-height: 32px;
@@ -527,8 +527,8 @@ body { background: #0A1626; font-family: -apple-system, BlinkMacSystemFont, "Seg
 #save-btn { background: #1B9FD8; border: none; color: #fff; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; margin-left: auto; white-space: nowrap; }
 #save-btn:hover { background: #1489BD; }
 #del-btn { background: #C0392B; border: none; color: #fff; border-radius: 5px; padding: 3px 8px; font-size: 12px; cursor: pointer; display: none; }
-#cvwrap { position: relative; overflow: hidden; }
-canvas { display: block; }
+#cvwrap { position: relative; overflow: hidden; width: 100%; }
+canvas { display: block; max-width: 100%; }
 #status { font-size: 10px; color: #2A4A6A; padding: 2px 8px; min-height: 16px; }
 </style>
 </head>
@@ -571,12 +571,12 @@ canvas { display: block; }
   <button onclick="commitTxt()" style="background:#1B9FD8;border:none;color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Agregar</button>
   <button onclick="cancelTxt()" style="background:#0A1626;border:1px solid #1B4060;color:#C8E4F0;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer;">&#10005;</button>
 </div>
-<div id="cvwrap">
-  <canvas id="cv" width="___CW___" height="___CH___"></canvas>
+<div id="cvwrap" style="width:100%;overflow:hidden;">
+  <canvas id="cv" width="___CW___" height="___CH___" style="width:100%;display:block;"></canvas>
 </div>
 <div id="status">Herramienta: Mover/Seleccionar</div>
 <script>
-var CW=___CW___,CH=___CH___,HR=10;
+var CW=___CW___,CH=___CH___,HR=5;
 var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 var els=___INIT___;
 var tool='tf',sel=-1,drag=null,drawing=null;
@@ -1805,7 +1805,7 @@ with tabs[5]:
             st.session_state.ed_cur_page = cur_page
 
             # ── Render background image (base64 PNG) for HTML canvas ────────
-            CANVAS_W = 860
+            CANVAS_W = 620
             _doc_ed = fitz.open(stream=ed_bytes, filetype="pdf")
             _pg_ed  = _doc_ed[cur_page]
             pw_r    = _pg_ed.rect.width
@@ -1969,6 +1969,7 @@ with tabs[5]:
 
                 # ── Receptor de datos del canvas ─────────────────────────────
                 st.markdown("---")
+                st.markdown('<style>[data-testid="stTextArea"]{display:none!important;}hr{display:none!important;}</style>', unsafe_allow_html=True)
                 _raw_json = st.text_area(
                     "NEXA_CANVAS_DATA",
                     key="ed_raw_json",
@@ -1988,7 +1989,7 @@ with tabs[5]:
 
             # ── Canvas principal (columna central) ─────────────────────────
             with canvas_col:
-                st.components.v1.html(_canvas_html, height=canvas_h + 160, scrolling=False)
+                st.components.v1.html(_canvas_html, height=canvas_h + 220, scrolling=False)
 
 
 # ==========================================
