@@ -758,7 +758,7 @@ function draw(){
 for(var _i=0;_i<els.length;_i++){ if(els[_i].type==='text') remeas(els[_i]); }
 
 // ── XY helper ──────────────────────────────────────────────────────────────
-function xy(e){ var r=cv.getBoundingClientRect(); return{x:e.clientX-r.left,y:e.clientY-r.top}; }
+function xy(e){ var r=cv.getBoundingClientRect(); return{x:(e.clientX-r.left)*(CW/r.width),y:(e.clientY-r.top)*(CH/r.height)}; }
 
 // ── Mouse down ─────────────────────────────────────────────────────────────
 cv.addEventListener('mousedown',function(e){
