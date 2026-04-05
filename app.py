@@ -349,6 +349,98 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 
 
 # ==========================================
+# FITZ (PyMuPDF) — Import global
+# ==========================================
+try:
+    import fitz
+    FITZ_OK = True
+except ImportError:
+    FITZ_OK = False
+
+
+# ==========================================
+# HELPERS — Miniaturas y tarjetas
+# ==========================================
+
+def _gen_thumbs(pdf_bytes: bytes, scale: float = 0.8):
+    """Genera lista de imágenes base64 (una por página) usando fitz."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    mat = fitz.Matrix(scale, scale)
+    result = []
+    for page in doc:
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        result.append(base64.b64encode(pix.tobytes("png")).decode())
+    n = len(doc)
+    doc.close()
+    return result, n
+
+
+def _ensure_thumbs(prefix: str, pdf_bytes: bytes, sel_key: str = None):
+    """
+    Devuelve (thumbs_b64_list, n_pages) cacheados en session_state.
+    Regenera sólo si el PDF cambió. Resetea sel_key si se indica.
+    """
+    sig = hashlib.md5(
+        pdf_bytes[:2048] + len(pdf_bytes).to_bytes(8, "big") + pdf_bytes[-2048:]
+    ).hexdigest()[:12]
+    if st.session_state.get(f"{prefix}_sig") != sig:
+        with st.spinner("Generando miniaturas…"):
+            thumbs, n = _gen_thumbs(pdf_bytes)
+        st.session_state[f"{prefix}_sig"]    = sig
+        st.session_state[f"{prefix}_thumbs"] = thumbs
+        st.session_state[f"{prefix}_n"]      = n
+        if sel_key:
+            st.session_state[sel_key] = set()
+    return st.session_state[f"{prefix}_thumbs"], st.session_state[f"{prefix}_n"]
+
+
+def _thumb_card(b64: str, page_num: int,
+                selected: bool = False,
+                mode: str = "delete",
+                badge_label: str = None,
+                badge_bg: str = "rgba(27,159,216,0.85)",
+                badge_fg: str = "#fff") -> str:
+    """
+    Retorna HTML de una tarjeta miniatura con borde condicional.
+    mode='delete' → borde rojo al seleccionar
+    mode='split'  → borde amarillo al seleccionar
+    """
+    if selected and mode == "delete":
+        border  = "2px solid rgba(220,50,50,0.85)"
+        overlay = ('<div style="position:absolute;inset:0;background:rgba(220,50,50,0.22);'
+                   'border-radius:7px;pointer-events:none;"></div>')
+        pin = ('<div style="position:absolute;top:5px;right:5px;background:rgba(220,50,50,0.9);'
+               'color:#fff;width:20px;height:20px;border-radius:50%;display:flex;'
+               'align-items:center;justify-content:center;font-size:12px;'
+               'font-weight:700;pointer-events:none;">✕</div>')
+    elif selected and mode == "split":
+        border  = "2px solid rgba(255,210,0,0.9)"
+        overlay = ('<div style="position:absolute;inset:0;background:rgba(255,210,0,0.1);'
+                   'border-radius:7px;pointer-events:none;"></div>')
+        pin = ('<div style="position:absolute;top:5px;right:5px;background:rgba(255,210,0,0.9);'
+               'color:#000;width:20px;height:20px;border-radius:50%;display:flex;'
+               'align-items:center;justify-content:center;font-size:11px;'
+               'font-weight:700;pointer-events:none;">✂</div>')
+    else:
+        border, overlay, pin = "2px solid rgba(27,159,216,0.25)", "", ""
+
+    badge = ""
+    if badge_label:
+        badge = (f'<div style="position:absolute;top:5px;left:5px;background:{badge_bg};'
+                 f'color:{badge_fg};padding:1px 6px;border-radius:7px;font-size:9px;'
+                 f'font-weight:700;pointer-events:none;">{badge_label}</div>')
+
+    return (f'<div style="border:{border};border-radius:10px;padding:6px;background:#0A1626;'
+            f'position:relative;margin-bottom:2px;">'
+            f'{overlay}{pin}{badge}'
+            f'<img src="data:image/png;base64,{b64}" '
+            f'style="width:100%;border-radius:6px;display:block;" draggable="false"/>'
+            f'<div style="text-align:center;font-size:11px;color:#2E5878;'
+            f'margin-top:5px;font-weight:600;">Pág. {page_num}</div>'
+            f'</div>')
+
+
+# ==========================================
 # LOGO Y DETECCIÓN DE RUTA
 # ==========================================
 ruta_logo = None
@@ -416,6 +508,7 @@ tabs = st.tabs([
     "🗜️ Comprimir PDF",
     "🔗 Merge PDF",
     "✏️ Editar PDF",
+    "🗑️ Eliminar Páginas",
 ])
 
 
@@ -848,22 +941,456 @@ with tabs[1]:
 
 
 # ==========================================
-# TABS 2-5 — PRÓXIMAMENTE
+# TAB 2 — DIVIDIR PDF
 # ==========================================
-_coming = [
-    ("✂️", "Dividir PDF",    "Extrae páginas o rangos específicos de cualquier PDF."),
-    ("🗜️", "Comprimir PDF",  "Reduce el tamaño de tus PDFs sin perder calidad visible."),
-    ("🔗", "Merge PDF",      "Combina PDFs con opciones avanzadas de intercalado y portada."),
-    ("✏️", "Editar PDF",     "Añade texto, anotaciones y firmas directamente sobre el PDF."),
-]
+with tabs[2]:
 
-for tab, (icon, title, desc) in zip(tabs[2:], _coming):
-    with tab:
-        st.markdown(f"""
-        <div class="nx-coming-soon">
-            <div class="nx-cs-icon">{icon}</div>
-            <div class="nx-cs-title">{title}</div>
-            <div class="nx-cs-sub">{desc}</div>
-            <div class="nx-cs-badge">Próximamente</div>
-        </div>
-        """, unsafe_allow_html=True)
+    for _k, _v in [("sp_splits", set()), ("sp_result", None),
+                   ("sp_sig", ""), ("sp_thumbs", []), ("sp_n", 0)]:
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">✂️ Dividir PDF</div>
+        <div class="nx-page-sub">Sube un PDF y marca visualmente los <strong>puntos de corte</strong>
+        para dividirlo en múltiples documentos. Descarga todas las partes en un ZIP.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    sp_file = st.file_uploader("Sube el PDF a dividir", type=["pdf"], key="sp_uploader")
+
+    if not sp_file:
+        st.session_state.sp_splits = set()
+        st.session_state.sp_result = None
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">✂️</div>
+            <div class="nx-empty-text">Sube un PDF para empezar a dividirlo</div>
+            <div class="nx-empty-sub">Podrás ver todas las páginas y elegir los puntos de corte</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        if not FITZ_OK:
+            st.error("⚠️ PyMuPDF no está instalado. Agrégalo a requirements.txt.")
+        else:
+            sp_bytes = sp_file.read()
+            thumbs, n_pages = _ensure_thumbs("sp", sp_bytes, "sp_splits")
+
+            if n_pages < 2:
+                st.warning("El PDF debe tener al menos 2 páginas para poder dividirse.")
+            else:
+                # ── Calcular secciones ─────────────────────────────────────
+                _SEC = [
+                    ("#1B9FD8","#fff"), ("#27AE60","#fff"), ("#E74C3C","#fff"),
+                    ("#F39C12","#000"), ("#9B59B6","#fff"), ("#1ABC9C","#fff"),
+                    ("#E91E63","#fff"), ("#FF9800","#000"),
+                ]
+                splits = st.session_state.sp_splits
+                sections, current = [], []
+                for i in range(n_pages):
+                    if i > 0 and i in splits:
+                        sections.append(list(current))
+                        current = []
+                    current.append(i)
+                if current:
+                    sections.append(current)
+                section_of = {}
+                for si, pgs in enumerate(sections):
+                    for p in pgs:
+                        section_of[p] = si
+                n_parts = len(sections)
+
+                # ── Grid de miniaturas ─────────────────────────────────────
+                st.markdown(
+                    '<div class="nx-section">✂️ Marca los puntos de corte</div>',
+                    unsafe_allow_html=True
+                )
+                st.info(
+                    "Pulsa **✂️ Cortar aquí** bajo cualquier página (excepto la 1ª) "
+                    "para iniciar un nuevo documento en esa página. "
+                    "Los colores de los badges indican cada parte resultante.",
+                    icon="ℹ️"
+                )
+
+                COLS = 4
+                for row_start in range(0, n_pages, COLS):
+                    cols = st.columns(COLS)
+                    for ci, pi in enumerate(range(row_start, min(row_start + COLS, n_pages))):
+                        si       = section_of[pi]
+                        bg, fg   = _SEC[si % len(_SEC)]
+                        is_split = (pi > 0 and pi in splits)
+                        with cols[ci]:
+                            st.markdown(
+                                _thumb_card(thumbs[pi], pi + 1,
+                                            selected=is_split, mode="split",
+                                            badge_label=f"Parte {si+1}",
+                                            badge_bg=bg, badge_fg=fg),
+                                unsafe_allow_html=True
+                            )
+                            if pi == 0:
+                                st.markdown(
+                                    '<div style="height:32px;font-size:10px;color:#0F2035;'
+                                    'text-align:center;">inicio</div>',
+                                    unsafe_allow_html=True
+                                )
+                            elif is_split:
+                                if st.button("↩ Desmarcar", key=f"sp_{pi}",
+                                             use_container_width=True):
+                                    st.session_state.sp_splits.discard(pi)
+                                    st.rerun()
+                            else:
+                                if st.button("✂️ Cortar aquí", key=f"sp_{pi}",
+                                             use_container_width=True):
+                                    st.session_state.sp_splits.add(pi)
+                                    st.rerun()
+
+                # ── Resumen de partes ──────────────────────────────────────
+                st.markdown(
+                    '<div class="nx-section">📄 Partes que se generarán</div>',
+                    unsafe_allow_html=True
+                )
+                for si, pgs in enumerate(sections):
+                    bg, fg = _SEC[si % len(_SEC)]
+                    sp_rng = (f"Pág. {pgs[0]+1}" if len(pgs) == 1
+                              else f"Págs. {pgs[0]+1}–{pgs[-1]+1}")
+                    st.markdown(
+                        f'<div style="background:rgba(27,159,216,0.04);'
+                        f'border:1px solid rgba(27,159,216,0.1);border-left:3px solid {bg};'
+                        f'border-radius:6px;padding:8px 14px;margin:3px 0;'
+                        f'display:flex;align-items:center;gap:12px;">'
+                        f'<span style="background:{bg};color:{fg};padding:2px 8px;'
+                        f'border-radius:6px;font-size:11px;font-weight:700;">Parte {si+1}</span>'
+                        f'<span style="color:#4A7A9C;font-size:13px;">{sp_rng} · '
+                        f'{len(pgs)} página{"s" if len(pgs)!=1 else ""}</span></div>',
+                        unsafe_allow_html=True
+                    )
+
+                # ── Botón dividir ──────────────────────────────────────────
+                st.markdown("---")
+                col_btn, col_dl = st.columns([2, 1])
+                with col_btn:
+                    if st.button(
+                        f"✂️ Dividir en {n_parts} PDF{'s' if n_parts>1 else ''}",
+                        type="primary", use_container_width=True,
+                        disabled=(n_parts < 2)
+                    ):
+                        with st.spinner("Dividiendo el PDF…"):
+                            try:
+                                reader  = PdfReader(BytesIO(sp_bytes))
+                                zip_buf = BytesIO()
+                                with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                                    for si2, pgs2 in enumerate(sections):
+                                        w2 = PdfWriter()
+                                        for p2 in pgs2:
+                                            w2.add_page(reader.pages[p2])
+                                        pb = BytesIO()
+                                        w2.write(pb)
+                                        zf.writestr(f"parte_{si2+1:02d}.pdf", pb.getvalue())
+                                zip_buf.seek(0)
+                                st.session_state.sp_result = zip_buf.getvalue()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error al dividir: {e}")
+
+                if st.session_state.sp_result:
+                    base_name = sp_file.name.replace(".pdf", "")
+                    with col_dl:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                    st.download_button(
+                        label="⬇️ Descargar ZIP con las partes",
+                        data=st.session_state.sp_result,
+                        file_name=f"{base_name}_dividido.zip",
+                        mime="application/zip",
+                        type="primary",
+                        use_container_width=True
+                    )
+
+
+# ==========================================
+# TAB 3 — COMPRIMIR PDF (próximamente)
+# ==========================================
+with tabs[3]:
+    st.markdown("""
+    <div class="nx-coming-soon">
+        <div class="nx-cs-icon">🗜️</div>
+        <div class="nx-cs-title">Comprimir PDF</div>
+        <div class="nx-cs-sub">Reduce el tamaño de tus PDFs sin perder calidad visible.</div>
+        <div class="nx-cs-badge">Próximamente</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ==========================================
+# TAB 4 — MERGE PDF (próximamente)
+# ==========================================
+with tabs[4]:
+    st.markdown("""
+    <div class="nx-coming-soon">
+        <div class="nx-cs-icon">🔗</div>
+        <div class="nx-cs-title">Merge PDF</div>
+        <div class="nx-cs-sub">Combina PDFs con opciones avanzadas de intercalado y portada.</div>
+        <div class="nx-cs-badge">Próximamente</div>
+    </div>""", unsafe_allow_html=True)
+
+
+# ==========================================
+# TAB 5 — EDITAR PDF (agregar texto)
+# ==========================================
+with tabs[5]:
+
+    for _k, _v in [("ed_sig", ""), ("ed_thumbs", []), ("ed_n", 0), ("ed_result", None)]:
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">✏️ Editar PDF</div>
+        <div class="nx-page-sub">Agrega texto personalizado sobre cualquier página del PDF
+        con vista previa en tiempo real.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    ed_sub = st.tabs(["✍️ Agregar Texto", "🔄 Rotar", "💧 Marca de Agua"])
+
+    # ── Agregar Texto ──────────────────────────────────────────────────────
+    with ed_sub[0]:
+
+        ed_file = st.file_uploader("Sube el PDF a editar", type=["pdf"], key="ed_uploader")
+
+        if not ed_file:
+            st.session_state.ed_result = None
+            st.markdown("""
+            <div class="nx-empty">
+                <div class="nx-empty-icon">✍️</div>
+                <div class="nx-empty-text">Sube un PDF para agregar texto</div>
+                <div class="nx-empty-sub">Elige página, posición, fuente y color</div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            if not FITZ_OK:
+                st.error("⚠️ PyMuPDF no está instalado.")
+            else:
+                ed_bytes = ed_file.read()
+                thumbs_ed, n_pages_ed = _ensure_thumbs("ed", ed_bytes)
+
+                st.markdown(
+                    '<div class="nx-section">⚙️ Configura el texto a insertar</div>',
+                    unsafe_allow_html=True
+                )
+
+                col_ctrl, col_prev = st.columns([1, 2])
+
+                with col_ctrl:
+                    page_idx = st.slider("Página", 1, n_pages_ed, 1,
+                                         key="ed_page") - 1
+
+                    txt = st.text_area("Texto a insertar", value="",
+                                       height=80, key="ed_text",
+                                       placeholder="Escribe aquí el texto…")
+
+                    font_size = st.slider("Tamaño de fuente (pt)", 6, 96, 14,
+                                          key="ed_fsize")
+
+                    color_hex = st.color_picker("Color del texto", "#000000",
+                                                key="ed_color")
+
+                    # Leer dimensiones reales de la página
+                    _doc_dim = fitz.open(stream=ed_bytes, filetype="pdf")
+                    _pg_dim  = _doc_dim[page_idx]
+                    pw = int(_pg_dim.rect.width)
+                    ph = int(_pg_dim.rect.height)
+                    _doc_dim.close()
+
+                    x_pos = st.slider("Posición X →", 0, pw, pw // 6, key="ed_x")
+                    y_pos = st.slider("Posición Y ↓", 0, ph, ph // 2, key="ed_y")
+
+                    cr = int(color_hex[1:3], 16) / 255
+                    cg = int(color_hex[3:5], 16) / 255
+                    cb = int(color_hex[5:7], 16) / 255
+                    color_rgb = (cr, cg, cb)
+
+                # ── Vista previa ───────────────────────────────────────────
+                with col_prev:
+                    st.markdown(
+                        '<div class="nx-section">🖼️ Vista previa</div>',
+                        unsafe_allow_html=True
+                    )
+                    try:
+                        _doc_prev = fitz.open(stream=ed_bytes, filetype="pdf")
+                        _pg_prev  = _doc_prev[page_idx]
+                        if txt.strip():
+                            _pg_prev.insert_text(
+                                fitz.Point(x_pos, y_pos),
+                                txt,
+                                fontsize=font_size,
+                                color=color_rgb
+                            )
+                        _pix = _pg_prev.get_pixmap(matrix=fitz.Matrix(1.3, 1.3), alpha=False)
+                        st.image(_pix.tobytes("png"), use_container_width=True)
+                        _doc_prev.close()
+                    except Exception as e:
+                        st.error(f"Error al generar vista previa: {e}")
+
+                # ── Insertar y descargar ───────────────────────────────────
+                st.markdown("---")
+                if st.button("💾 Insertar texto en el PDF",
+                             type="primary", use_container_width=True,
+                             disabled=(not txt.strip())):
+                    with st.spinner("Procesando…"):
+                        try:
+                            _doc_edit = fitz.open(stream=ed_bytes, filetype="pdf")
+                            _doc_edit[page_idx].insert_text(
+                                fitz.Point(x_pos, y_pos),
+                                txt, fontsize=font_size, color=color_rgb
+                            )
+                            _buf = BytesIO()
+                            _doc_edit.save(_buf)
+                            _doc_edit.close()
+                            _buf.seek(0)
+                            st.session_state.ed_result = _buf.getvalue()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al editar: {e}")
+
+                if st.session_state.ed_result:
+                    ed_name = ed_file.name.replace(".pdf", "_editado.pdf")
+                    st.download_button(
+                        label="⬇️ Descargar PDF con texto insertado",
+                        data=st.session_state.ed_result,
+                        file_name=ed_name,
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+
+    # ── Rotar / Marca de Agua — Próximamente ──────────────────────────────
+    for _sub, _icon, _lbl in [
+        (ed_sub[1], "🔄", "Rotar páginas"),
+        (ed_sub[2], "💧", "Marca de Agua"),
+    ]:
+        with _sub:
+            st.markdown(f"""
+            <div class="nx-coming-soon">
+                <div class="nx-cs-icon">{_icon}</div>
+                <div class="nx-cs-title">{_lbl}</div>
+                <div class="nx-cs-sub">Esta función estará disponible próximamente.</div>
+                <div class="nx-cs-badge">Próximamente</div>
+            </div>""", unsafe_allow_html=True)
+
+
+# ==========================================
+# TAB 6 — ELIMINAR PÁGINAS
+# ==========================================
+with tabs[6]:
+
+    for _k, _v in [("ep_sel", set()), ("ep_result", None),
+                   ("ep_sig", ""), ("ep_thumbs", []), ("ep_n", 0)]:
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    st.markdown("""
+    <div class="nx-page-header">
+        <div class="nx-page-title">🗑️ Eliminar Páginas</div>
+        <div class="nx-page-sub">Selecciona visualmente las páginas que quieres
+        <strong>eliminar</strong> y descarga el PDF resultante.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    ep_file = st.file_uploader("Sube el PDF", type=["pdf"], key="ep_uploader")
+
+    if not ep_file:
+        st.session_state.ep_sel    = set()
+        st.session_state.ep_result = None
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">🗑️</div>
+            <div class="nx-empty-text">Sube un PDF para eliminar páginas</div>
+            <div class="nx-empty-sub">Verás todas las páginas y podrás seleccionar las que quieres borrar</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        if not FITZ_OK:
+            st.error("⚠️ PyMuPDF no está instalado.")
+        else:
+            ep_bytes = ep_file.read()
+            thumbs_ep, n_pages_ep = _ensure_thumbs("ep", ep_bytes, "ep_sel")
+            n_sel = len(st.session_state.ep_sel)
+
+            # ── Barra de estado + acciones rápidas ─────────────────────────
+            st.markdown(
+                '<div class="nx-section">🗑️ Selecciona las páginas a eliminar</div>',
+                unsafe_allow_html=True
+            )
+
+            col_info, col_all, col_none = st.columns([3, 1, 1])
+            with col_info:
+                sel_txt = (f"**{n_sel}** página{'s' if n_sel!=1 else ''} marcada{'s' if n_sel!=1 else ''} "
+                           f"de {n_pages_ep}")
+                st.info(sel_txt, icon="🗑️")
+            with col_all:
+                if st.button("Seleccionar todas", use_container_width=True):
+                    st.session_state.ep_sel = set(range(n_pages_ep))
+                    st.rerun()
+            with col_none:
+                if st.button("Deseleccionar todas", use_container_width=True):
+                    st.session_state.ep_sel = set()
+                    st.rerun()
+
+            # ── Grid de miniaturas ─────────────────────────────────────────
+            COLS = 4
+            for row_start in range(0, n_pages_ep, COLS):
+                cols_ep = st.columns(COLS)
+                for ci, pi in enumerate(range(row_start, min(row_start + COLS, n_pages_ep))):
+                    is_sel = pi in st.session_state.ep_sel
+                    with cols_ep[ci]:
+                        st.markdown(
+                            _thumb_card(thumbs_ep[pi], pi + 1,
+                                        selected=is_sel, mode="delete"),
+                            unsafe_allow_html=True
+                        )
+                        if is_sel:
+                            if st.button("✕ Deseleccionar", key=f"ep_{pi}",
+                                         use_container_width=True):
+                                st.session_state.ep_sel.discard(pi)
+                                st.rerun()
+                        else:
+                            if st.button("☐ Seleccionar", key=f"ep_{pi}",
+                                         use_container_width=True):
+                                st.session_state.ep_sel.add(pi)
+                                st.rerun()
+
+            # ── Acción ────────────────────────────────────────────────────
+            st.markdown("---")
+            pages_to_keep = n_pages_ep - n_sel
+            if n_sel == 0:
+                st.info("Selecciona al menos una página para eliminar.", icon="ℹ️")
+            elif pages_to_keep == 0:
+                st.warning("⚠️ No puedes eliminar todas las páginas. Debes conservar al menos una.")
+            else:
+                if st.button(
+                    f"🗑️ Eliminar {n_sel} página{'s' if n_sel>1 else ''} "
+                    f"(quedan {pages_to_keep})",
+                    type="primary", use_container_width=True
+                ):
+                    with st.spinner("Generando PDF…"):
+                        try:
+                            reader = PdfReader(BytesIO(ep_bytes))
+                            writer = PdfWriter()
+                            for pi in range(n_pages_ep):
+                                if pi not in st.session_state.ep_sel:
+                                    writer.add_page(reader.pages[pi])
+                            ep_buf = BytesIO()
+                            writer.write(ep_buf)
+                            ep_buf.seek(0)
+                            st.session_state.ep_result = ep_buf.getvalue()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+            if st.session_state.ep_result:
+                ep_name = ep_file.name.replace(".pdf", "_sin_paginas.pdf")
+                st.download_button(
+                    label=f"⬇️ Descargar PDF ({pages_to_keep} páginas)",
+                    data=st.session_state.ep_result,
+                    file_name=ep_name,
+                    mime="application/pdf",
+                    type="primary",
+                    use_container_width=True
+                )
