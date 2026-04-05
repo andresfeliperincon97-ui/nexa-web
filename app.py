@@ -565,6 +565,12 @@ canvas { display: block; }
   <span class="lbl">Color texto:</span>
   <div class="pal" id="pal2"></div>
 </div>
+<div id="txt-input-area" style="display:none;padding:5px 8px;background:#0E1E30;border-bottom:1px solid #1B4060;align-items:center;gap:6px;flex-wrap:nowrap;">
+  <span style="font-size:11px;color:#4A7A9C;white-space:nowrap;">&#128204; Texto:</span>
+  <input type="text" id="txt-inp" placeholder="Escribe el texto..." onkeydown="if(event.key==='Enter'){commitTxt();}else if(event.key==='Escape'){cancelTxt();}" style="flex:1;background:#0A1626;color:#C8E4F0;border:1px solid #1B9FD8;border-radius:4px;font-size:12px;padding:3px 8px;outline:none;min-width:120px;">
+  <button onclick="commitTxt()" style="background:#1B9FD8;border:none;color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Agregar</button>
+  <button onclick="cancelTxt()" style="background:#0A1626;border:1px solid #1B4060;color:#C8E4F0;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer;">&#10005;</button>
+</div>
 <div id="cvwrap">
   <canvas id="cv" width="___CW___" height="___CH___"></canvas>
 </div>
@@ -575,6 +581,7 @@ var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 var els=___INIT___;
 var tool='tf',sel=-1,drag=null,drawing=null;
 var aCol='#000000',tCol='#000000',bold=false,ital=false;
+var pendTx=null,pendTy=null,pendIdx=null;
 
 var bg=new Image(); bg.onload=draw;
 bg.src='data:image/png;base64,___BG___';
@@ -736,6 +743,15 @@ function draw(){
   else{ ctx.fillStyle='#f0f0f0'; ctx.fillRect(0,0,CW,CH); }
   for(var i=0;i<els.length;i++) dE(els[i],i===sel,false);
   if(drawing) dE(drawing,false,true);
+  if(pendTx!==null){
+    ctx.save(); ctx.strokeStyle='#1B9FD8'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(pendTx-10,pendTy); ctx.lineTo(pendTx+10,pendTy);
+    ctx.moveTo(pendTx,pendTy-10); ctx.lineTo(pendTx,pendTy+10);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(pendTx,pendTy,3,0,Math.PI*2);
+    ctx.fillStyle='#1B9FD8'; ctx.fill();
+    ctx.restore();
+  }
 }
 
 // Init text measurements
@@ -763,7 +779,7 @@ cv.addEventListener('mousedown',function(e){
     document.getElementById('tb2').style.display='none';
     draw(); return;
   }
-  if(tool==='text'){ addTxt(p.x,p.y,null); return; }
+  if(tool==='text'){ startTxt(p.x,p.y,null); return; }
   var fc=getFill();
   if(tool==='rect') drawing={type:'rect',x:p.x,y:p.y,w:0,h:0,sc:aCol,sw:getSW(),fc:fc};
   if(tool==='ell')  drawing={type:'ell', x:p.x,y:p.y,w:0,h:0,sc:aCol,sw:getSW(),fc:fc};
@@ -864,43 +880,40 @@ function syncTB(e){
   document.getElementById('tb2').style.display='flex';
 }
 function editTxt(idx){
-  sel=idx; syncTB(els[idx]); addTxt(els[idx].x,els[idx].y,idx);
+  sel=idx; syncTB(els[idx]);
+  var e=els[idx]; e._hid=true;
+  startTxt(e.x,e.y,idx);
 }
-function addTxt(cx,cy,eidx){
-  var wrap=document.getElementById('cvwrap');
-  var ex=(eidx!==null&&eidx>=0)?els[eidx]:null;
-  var fs=ex?ex.fs:getFS(), ff=ex?ex.ff:getFF(), tc=ex?ex.tc:tCol;
-  var b=ex?!!ex.bold:bold, it=ex?!!ex.ital:ital, iv=ex?ex.txt:'';
-  if(ex){ ex._hid=true; draw(); }
-  var inp=document.createElement('input');
-  inp.type='text'; inp.value=iv;
-  inp.style.cssText=[
-    'position:absolute','left:'+(ex?ex.x:cx)+'px','top:'+(ex?ex.y:cy)+'px',
-    'font-size:'+fs+'px','font-family:'+ff,'color:'+tc,
-    'font-weight:'+(b?'bold':'normal'),'font-style:'+(it?'italic':'normal'),
-    'background:rgba(255,255,255,0.94)','border:1.5px dashed #1B9FD8','border-radius:3px',
-    'padding:2px 6px','min-width:80px','max-width:'+(CW-(ex?ex.x:cx)-4)+'px',
-    'outline:none','z-index:20'
-  ].join(';');
-  wrap.appendChild(inp); inp.focus();
-  if(iv) inp.setSelectionRange(0,iv.length);
-  var done=false;
-  function fin(){
-    if(done) return; done=true;
-    var v=inp.value.trim();
-    if(ex){
-      ex._hid=false;
-      if(v){ ex.txt=v; ex.ff=getFF(); ex.fs=getFS(); ex.tc=tCol; ex.bold=bold; ex.ital=ital; remeas(ex); }
-      else{ els.splice(eidx,1); sel=-1; }
-    } else if(v){
-      var ne={type:'text',x:cx,y:cy,txt:v,ff:getFF(),fs:getFS(),tc:tCol,bold:bold,ital:ital,w:0,h:0};
-      remeas(ne); els.push(ne);
-    }
-    if(inp.parentNode) inp.parentNode.removeChild(inp);
-    draw();
+function startTxt(cx,cy,eidx){
+  pendTx=cx; pendTy=cy; pendIdx=eidx;
+  var inp=document.getElementById('txt-inp');
+  inp.value=(eidx!==null&&eidx>=0&&els[eidx])?els[eidx].txt:'';
+  document.getElementById('txt-input-area').style.display='flex';
+  inp.focus();
+  if(inp.value) inp.setSelectionRange(0,inp.value.length);
+  draw();
+}
+function commitTxt(){
+  var v=document.getElementById('txt-inp').value.trim();
+  if(pendIdx!==null&&pendIdx>=0&&pendIdx<els.length){
+    var ex=els[pendIdx]; ex._hid=false;
+    if(v){ ex.txt=v; ex.ff=getFF(); ex.fs=getFS(); ex.tc=tCol; ex.bold=bold; ex.ital=ital; remeas(ex); }
+    else{ els.splice(pendIdx,1); sel=-1; }
+  } else if(v&&pendTx!==null){
+    var ne={type:'text',x:pendTx,y:pendTy,txt:v,ff:getFF(),fs:getFS(),tc:tCol,bold:bold,ital:ital,w:0,h:0};
+    remeas(ne); els.push(ne);
   }
-  inp.addEventListener('keydown',function(ev){ if(ev.key==='Enter'||ev.key==='Escape'){ ev.preventDefault(); fin(); } });
-  inp.addEventListener('blur',function(){ setTimeout(fin,80); });
+  pendTx=null; pendTy=null; pendIdx=null;
+  document.getElementById('txt-input-area').style.display='none';
+  document.getElementById('txt-inp').value='';
+  draw();
+}
+function cancelTxt(){
+  if(pendIdx!==null&&pendIdx>=0&&pendIdx<els.length) els[pendIdx]._hid=false;
+  pendTx=null; pendTy=null; pendIdx=null;
+  document.getElementById('txt-input-area').style.display='none';
+  document.getElementById('txt-inp').value='';
+  draw();
 }
 
 // ── Keys ────────────────────────────────────────────────────────────────────
@@ -1792,7 +1805,7 @@ with tabs[5]:
             st.session_state.ed_cur_page = cur_page
 
             # ── Render background image (base64 PNG) for HTML canvas ────────
-            CANVAS_W = 680
+            CANVAS_W = 860
             _doc_ed = fitz.open(stream=ed_bytes, filetype="pdf")
             _pg_ed  = _doc_ed[cur_page]
             pw_r    = _pg_ed.rect.width
@@ -1975,7 +1988,7 @@ with tabs[5]:
 
             # ── Canvas principal (columna central) ─────────────────────────
             with canvas_col:
-                st.components.v1.html(_canvas_html, height=canvas_h + 80, scrolling=False)
+                st.components.v1.html(_canvas_html, height=canvas_h + 160, scrolling=False)
 
 
 # ==========================================
