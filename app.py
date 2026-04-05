@@ -113,35 +113,12 @@ footer                           { visibility: hidden !important; }
 /* Divisor en sidebar */
 [data-testid="stSidebar"] hr { border-color: rgba(27,159,216,0.1) !important; margin: 6px 0 !important; }
 
-/* ══════════════════════════════════════════════════════
-   SIDEBAR COLAPSADA — CSS condicional vía clase en body
-══════════════════════════════════════════════════════ */
-/* El sidebar nativo de Streamlit maneja su propio colapso.
-   Forzamos que el botón nativo sea VISIBLE y estilizado. */
-[data-testid="stSidebarCollapseButton"],
-[data-testid="collapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-/* Estilizar el botón nativo de colapsar */
+/* Botón nativo de colapsar — permitir que Streamlit lo maneje */
 [data-testid="stSidebarCollapseButton"] button,
 [data-testid="collapsedControl"] button {
     background: #040D1A !important;
     border: 1px solid rgba(27,159,216,0.3) !important;
-    border-radius: 0 8px 8px 0 !important;
     color: #1B9FD8 !important;
-    width: 20px !important;
-    height: 56px !important;
-    padding: 0 !important;
-    box-shadow: 3px 0 12px rgba(0,0,0,0.4) !important;
-    transition: background 0.2s, border-color 0.2s !important;
-}
-[data-testid="stSidebarCollapseButton"] button:hover,
-[data-testid="collapsedControl"] button:hover {
-    background: #061422 !important;
-    border-color: #1B9FD8 !important;
 }
 [data-testid="stSidebarCollapseButton"] svg,
 [data-testid="collapsedControl"] svg {
@@ -463,6 +440,23 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
 """, unsafe_allow_html=True)
 
 # ==========================================
+# SESSION STATE — NAVEGACIÓN Y SIDEBAR
+# ==========================================
+OPCIONES = [
+    "🗂️ Nexíficar PDFs Masivamente",
+    "📄🔗📄 Nexíficar PDFs",
+    "✂️ Dividir PDF",
+    "🗜️ Comprimir PDF",
+    "🔗 Merge PDF",
+    "✏️ Editar PDF",
+]
+
+if "opcion" not in st.session_state:
+    st.session_state.opcion = OPCIONES[0]
+if "sidebar_visible" not in st.session_state:
+    st.session_state.sidebar_visible = True
+
+# ==========================================
 # SIDEBAR
 # ==========================================
 ruta_logo = None
@@ -484,21 +478,15 @@ st.sidebar.markdown("""
 <div class="nx-nav-section">SUITE PDF</div>
 """, unsafe_allow_html=True)
 
-opcion = st.sidebar.radio(
-    "",
-    (
-        "🗂️ Nexíficar PDFs Masivamente",
-        "📄🔗📄 Nexíficar PDFs",
-        "✂️ Dividir PDF",
-        "🗜️ Comprimir PDF",
-        "🔗 Merge PDF",
-        "✏️ Editar PDF",
-    ),
-    label_visibility="collapsed"
-)
+# Botones de navegación en sidebar (Python puro, sin JS)
+for op in OPCIONES:
+    is_active = st.session_state.opcion == op
+    btn_style = "primary" if is_active else "secondary"
+    if st.sidebar.button(op, key=f"nav_{op}", use_container_width=True, type=btn_style):
+        st.session_state.opcion = op
+        st.rerun()
 
 st.sidebar.markdown("---")
-
 st.sidebar.markdown("""
 <div style="margin:6px 10px 10px 10px;padding:11px 14px;
             background:rgba(27,159,216,0.04);
@@ -515,6 +503,62 @@ st.sidebar.markdown("""
         </div>
     </div>
 </div>
+""", unsafe_allow_html=True)
+
+# Leer opción activa desde session_state
+opcion = st.session_state.opcion
+
+# ── BOTÓN TOGGLE VISIBLE EN ÁREA PRINCIPAL ──────────────────────────────
+# Siempre visible en la esquina superior izquierda del contenido
+st.markdown("""
+<style>
+/* Barra superior de navegación fija con toggle */
+.nx-topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: #040D1A;
+    border-bottom: 1px solid rgba(27,159,216,0.12);
+    z-index: 99998;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+}
+/* Empujar contenido hacia abajo para no tapar con barra */
+.block-container { padding-top: 3.2rem !important; }
+
+/* Botones sidebar como nav pills */
+[data-testid="stSidebar"] [data-testid="baseButton-primary"] {
+    background: rgba(27,159,216,0.13) !important;
+    border: none !important;
+    border-left: 3px solid #1B9FD8 !important;
+    border-radius: 0 6px 6px 0 !important;
+    color: #1B9FD8 !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    text-align: left !important;
+    margin: 1px 8px 1px 0 !important;
+    box-shadow: none !important;
+}
+[data-testid="stSidebar"] [data-testid="baseButton-secondary"] {
+    background: transparent !important;
+    border: none !important;
+    border-left: 3px solid transparent !important;
+    border-radius: 0 6px 6px 0 !important;
+    color: #2E4D6A !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    text-align: left !important;
+    margin: 1px 8px 1px 0 !important;
+    box-shadow: none !important;
+}
+[data-testid="stSidebar"] [data-testid="baseButton-secondary"]:hover {
+    background: rgba(27,159,216,0.07) !important;
+    color: #5A9FC4 !important;
+    border-left-color: rgba(27,159,216,0.3) !important;
+}
+</style>
 """, unsafe_allow_html=True)
 
 
