@@ -44,9 +44,11 @@ footer                         { visibility: hidden !important; }
     background: #060F1D !important;
 }
 .block-container {
-    padding-top: 0 !important;
+    padding-top: 1rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
     padding-bottom: 3rem !important;
-    max-width: 1200px !important;
+    max-width: 100% !important;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -527,7 +529,7 @@ body { background: #0A1626; font-family: -apple-system, BlinkMacSystemFont, "Seg
 #save-btn { background: #1B9FD8; border: none; color: #fff; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer; margin-left: auto; white-space: nowrap; }
 #save-btn:hover { background: #1489BD; }
 #del-btn { background: #C0392B; border: none; color: #fff; border-radius: 5px; padding: 3px 8px; font-size: 12px; cursor: pointer; display: none; }
-#cvwrap { position: relative; overflow: auto; width: 100%; }
+#cvwrap { position: relative; overflow: hidden; width: 100%; }
 canvas { display: block; }
 #status { font-size: 10px; color: #2A4A6A; padding: 2px 8px; min-height: 16px; }
 </style>
@@ -575,7 +577,7 @@ canvas { display: block; }
   <button onclick="commitTxt()" style="background:#1B9FD8;border:none;color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Agregar</button>
   <button onclick="cancelTxt()" style="background:#0A1626;border:1px solid #1B4060;color:#C8E4F0;border-radius:5px;padding:3px 8px;font-size:12px;cursor:pointer;">&#10005;</button>
 </div>
-<div id="cvwrap" style="width:100%;overflow:auto;">
+<div id="cvwrap" style="width:100%;overflow:hidden;">
   <canvas id="cv" width="___CW___" height="___CH___" style="display:block;transform-origin:top left;"></canvas>
 </div>
 <div id="status">Herramienta: Mover/Seleccionar</div>
@@ -770,7 +772,9 @@ function applyZoom(){
   cv.style.transform='scale('+zoom+')';
   cv.style.transformOrigin='top left';
   cv.style.width=(CW*zoom)+'px';
-  document.getElementById('cvwrap').style.height=(CH*zoom)+'px';
+  var wrap=document.getElementById('cvwrap');
+  wrap.style.height=(CH*zoom)+'px';
+  wrap.style.overflow=zoom>1?'auto':'hidden';
   document.getElementById('zoom-lbl').textContent=Math.round(zoom*100)+'%';
 }
 function zoomIn(){ var zi=ZOOMS.indexOf(zoom); if(zi<ZOOMS.length-1){ zoom=ZOOMS[zi+1]; applyZoom(); } }
