@@ -60,12 +60,7 @@ footer                           { visibility: hidden !important; }
     padding: 0 !important;
 }
 
-/* Ocultar el botón nativo de colapsar de Streamlit */
-[data-testid="collapsedControl"],
-button[data-testid="baseButton-headerNoPadding"],
-[data-testid="stSidebarCollapseButton"] {
-    display: none !important;
-}
+/* Botón nativo de colapsar — visible y funcional */
 
 /* Scrollbar del sidebar */
 [data-testid="stSidebar"]::-webkit-scrollbar       { width: 4px; }
@@ -119,46 +114,39 @@ button[data-testid="baseButton-headerNoPadding"],
 [data-testid="stSidebar"] hr { border-color: rgba(27,159,216,0.1) !important; margin: 6px 0 !important; }
 
 /* ══════════════════════════════════════════════════════
-   BOTÓN TOGGLE SIDEBAR PERSONALIZADO
+   SIDEBAR COLAPSADA — CSS condicional vía clase en body
 ══════════════════════════════════════════════════════ */
-#nx-sidebar-toggle {
-    position: fixed;
-    top: 50%;
-    left: 252px;
-    transform: translateY(-50%);
-    z-index: 99999;
-    width: 20px;
-    height: 56px;
-    background: #040D1A;
-    border: 1px solid rgba(27,159,216,0.25);
-    border-left: none;
-    border-radius: 0 8px 8px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: left 0.3s ease, background 0.2s, border-color 0.2s;
-    box-shadow: 3px 0 12px rgba(0,0,0,0.4);
+/* El sidebar nativo de Streamlit maneja su propio colapso.
+   Forzamos que el botón nativo sea VISIBLE y estilizado. */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
-#nx-sidebar-toggle:hover {
-    background: #061422;
-    border-color: rgba(27,159,216,0.5);
+
+/* Estilizar el botón nativo de colapsar */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="collapsedControl"] button {
+    background: #040D1A !important;
+    border: 1px solid rgba(27,159,216,0.3) !important;
+    border-radius: 0 8px 8px 0 !important;
+    color: #1B9FD8 !important;
+    width: 20px !important;
+    height: 56px !important;
+    padding: 0 !important;
+    box-shadow: 3px 0 12px rgba(0,0,0,0.4) !important;
+    transition: background 0.2s, border-color 0.2s !important;
 }
-#nx-sidebar-toggle svg {
-    transition: transform 0.3s ease;
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="collapsedControl"] button:hover {
+    background: #061422 !important;
+    border-color: #1B9FD8 !important;
 }
-body.nx-sidebar-collapsed #nx-sidebar-toggle {
-    left: 0px;
-}
-body.nx-sidebar-collapsed #nx-sidebar-toggle svg {
-    transform: rotate(180deg);
-}
-body.nx-sidebar-collapsed [data-testid="stSidebar"] {
-    margin-left: -252px !important;
-    transition: margin-left 0.3s ease !important;
-}
-[data-testid="stSidebar"] {
-    transition: margin-left 0.3s ease !important;
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="collapsedControl"] svg {
+    color: #1B9FD8 !important;
+    fill: #1B9FD8 !important;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -472,32 +460,6 @@ hr { border-color: rgba(27,159,216,0.1) !important; }
     margin-bottom: 10px;
 }
 </style>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# BOTÓN TOGGLE SIDEBAR (JS — fix expandir/colapsar)
-# ==========================================
-st.markdown("""
-<div id="nx-sidebar-toggle" onclick="toggleSidebar()" title="Mostrar / Ocultar menú">
-    <svg width="10" height="16" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M7 2L2 8L7 14" stroke="#1B9FD8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-</div>
-<script>
-(function() {
-    var collapsed = false;
-
-    function toggleSidebar() {
-        collapsed = !collapsed;
-        if (collapsed) {
-            document.body.classList.add('nx-sidebar-collapsed');
-        } else {
-            document.body.classList.remove('nx-sidebar-collapsed');
-        }
-    }
-    window.toggleSidebar = toggleSidebar;
-})();
-</script>
 """, unsafe_allow_html=True)
 
 # ==========================================
