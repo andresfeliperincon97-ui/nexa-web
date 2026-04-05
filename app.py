@@ -62,6 +62,7 @@ footer                         { visibility: hidden !important; }
     border: 1px solid rgba(27,159,216,0.1) !important;
     margin-bottom: 24px !important;
     flex-wrap: wrap !important;
+    justify-content: center !important;
 }
 .stTabs [data-baseweb="tab"] {
     background: transparent !important;
@@ -92,6 +93,12 @@ footer                         { visibility: hidden !important; }
 /* Contenido de los tabs */
 .stTabs [data-testid="stTabsContent"] {
     padding-top: 0 !important;
+}
+
+/* Panel lateral sticky */
+[data-testid="stVerticalBlock"]:has(>[data-testid="stVerticalBlockBorderWrapper"]) {
+    position: sticky;
+    top: 80px;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1310,171 +1317,200 @@ with tabs[1]:
         st.session_state.nx_order = [n for n in st.session_state.nx_order if n in file_info_map]
         orden = st.session_state.nx_order
 
-        # ── PASO 2 ────────────────────────────────────────────────────────
-        if not st.session_state.nx_done:
 
-            st.markdown('<div class="nx-section">📋 Paso 2 — Ajusta el orden y selecciona los PDFs</div>',
-                        unsafe_allow_html=True)
-            st.info(
-                "Edita los números de **Orden** para cambiar la posición. "
-                "Desmarca **✓** para excluir un PDF del resultado. "
-                "Pulsa **Aplicar orden** para confirmar.",
-                icon="ℹ️"
-            )
+        # ── Layout 2 columnas ─────────────────────────────────────────────
+        _nx_col, _nx_panel = st.columns([3, 1])
 
-            order_df = pd.DataFrame([
-                {
-                    "Orden":   i + 1,
-                    "✓":       True,
-                    "Archivo": name,
-                    "Páginas": str(file_info_map[name]["pages"]),
-                    "Tamaño":  file_info_map[name]["size"],
-                }
-                for i, name in enumerate(orden)
-            ])
-
-            edited_df = st.data_editor(
-                order_df,
-                column_config={
-                    "Orden":   st.column_config.NumberColumn(
-                                   "Orden", min_value=1, max_value=len(orden),
-                                   step=1, width="small"),
-                    "✓":       st.column_config.CheckboxColumn("✓", width="small"),
-                    "Archivo": st.column_config.TextColumn("Archivo", disabled=True),
-                    "Páginas": st.column_config.TextColumn("Páginas", disabled=True, width="small"),
-                    "Tamaño":  st.column_config.TextColumn("Tamaño",  disabled=True, width="small"),
-                },
-                hide_index=True,
-                use_container_width=True,
-                key=f"order_editor_{st.session_state.nx_editor_ver}",
-            )
-
-            if st.button("↺ Aplicar orden", use_container_width=True):
-                nuevos = (
-                    edited_df[edited_df["✓"]]
-                    .sort_values("Orden")["Archivo"]
-                    .tolist()
+        with _nx_panel:
+            with st.container(border=True):
+                st.markdown(
+                    '<div style="font-size:15px;font-weight:700;color:#C8E4F0;margin-bottom:12px;">📄🔗📄 Nexíficar PDFs</div>',
+                    unsafe_allow_html=True
                 )
-                if not nuevos:
-                    st.warning("⚠️ Debes incluir al menos un PDF.")
-                else:
-                    st.session_state.nx_order      = nuevos
-                    st.session_state.nx_editor_ver += 1
-                    st.rerun()
+                _n_arch = len(orden)
+                st.markdown(
+                    f'<div style="font-size:12px;color:#4A7A9C;margin-bottom:8px;">'
+                    f'{_n_arch} archivo{"s" if _n_arch!=1 else ""} cargado{"s" if _n_arch!=1 else ""}</div>',
+                    unsafe_allow_html=True
+                )
+                if st.session_state.nx_done and st.session_state.nx_buffer:
+                    st.download_button(
+                        label="⬇️ Descargar PDF",
+                        data=st.session_state.nx_buffer,
+                        file_name=st.session_state.nx_nombre,
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True,
+                        key="nx_dl_panel"
+                    )
 
-            # Vista previa de miniaturas
-            if orden:
-                st.markdown('<div class="nx-section">🖼️ Vista previa del orden actual</div>',
+        with _nx_col:
+
+            # ── PASO 2 ────────────────────────────────────────────────────────
+            if not st.session_state.nx_done:
+
+                st.markdown('<div class="nx-section">📋 Paso 2 — Ajusta el orden y selecciona los PDFs</div>',
                             unsafe_allow_html=True)
-                CARDS_PER_ROW = 4
-                for row_start in range(0, len(orden), CARDS_PER_ROW):
-                    row_slice = orden[row_start : row_start + CARDS_PER_ROW]
-                    cols = st.columns(CARDS_PER_ROW)
-                    for col_offset, name in enumerate(row_slice):
-                        fi  = file_info_map[name]
-                        idx = row_start + col_offset
-                        with cols[col_offset]:
-                            with st.container(border=True):
-                                if fi["thumb"]:
-                                    st.image(base64.b64decode(fi["thumb"]),
-                                             use_container_width=True)
-                                else:
+                st.info(
+                    "Edita los números de **Orden** para cambiar la posición. "
+                    "Desmarca **✓** para excluir un PDF del resultado. "
+                    "Pulsa **Aplicar orden** para confirmar.",
+                    icon="ℹ️"
+                )
+
+                order_df = pd.DataFrame([
+                    {
+                        "Orden":   i + 1,
+                        "✓":       True,
+                        "Archivo": name,
+                        "Páginas": str(file_info_map[name]["pages"]),
+                        "Tamaño":  file_info_map[name]["size"],
+                    }
+                    for i, name in enumerate(orden)
+                ])
+
+                edited_df = st.data_editor(
+                    order_df,
+                    column_config={
+                        "Orden":   st.column_config.NumberColumn(
+                                       "Orden", min_value=1, max_value=len(orden),
+                                       step=1, width="small"),
+                        "✓":       st.column_config.CheckboxColumn("✓", width="small"),
+                        "Archivo": st.column_config.TextColumn("Archivo", disabled=True),
+                        "Páginas": st.column_config.TextColumn("Páginas", disabled=True, width="small"),
+                        "Tamaño":  st.column_config.TextColumn("Tamaño",  disabled=True, width="small"),
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key=f"order_editor_{st.session_state.nx_editor_ver}",
+                )
+
+                if st.button("↺ Aplicar orden", use_container_width=True):
+                    nuevos = (
+                        edited_df[edited_df["✓"]]
+                        .sort_values("Orden")["Archivo"]
+                        .tolist()
+                    )
+                    if not nuevos:
+                        st.warning("⚠️ Debes incluir al menos un PDF.")
+                    else:
+                        st.session_state.nx_order      = nuevos
+                        st.session_state.nx_editor_ver += 1
+                        st.rerun()
+
+                # Vista previa de miniaturas
+                if orden:
+                    st.markdown('<div class="nx-section">🖼️ Vista previa del orden actual</div>',
+                                unsafe_allow_html=True)
+                    CARDS_PER_ROW = 4
+                    for row_start in range(0, len(orden), CARDS_PER_ROW):
+                        row_slice = orden[row_start : row_start + CARDS_PER_ROW]
+                        cols = st.columns(CARDS_PER_ROW)
+                        for col_offset, name in enumerate(row_slice):
+                            fi  = file_info_map[name]
+                            idx = row_start + col_offset
+                            with cols[col_offset]:
+                                with st.container(border=True):
+                                    if fi["thumb"]:
+                                        st.image(base64.b64decode(fi["thumb"]),
+                                                 use_container_width=True)
+                                    else:
+                                        st.markdown(
+                                            '<div style="background:#07111C;border-radius:8px;'
+                                            'height:100px;display:flex;align-items:center;'
+                                            'justify-content:center;font-size:32px;">📄</div>',
+                                            unsafe_allow_html=True
+                                        )
+                                    short = (fi["name"][:22] + "…") if len(fi["name"]) > 22 else fi["name"]
                                     st.markdown(
-                                        '<div style="background:#07111C;border-radius:8px;'
-                                        'height:100px;display:flex;align-items:center;'
-                                        'justify-content:center;font-size:32px;">📄</div>',
+                                        f'<div style="font-size:12px;font-weight:600;color:#C8E4F0;'
+                                        f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                                        f'margin:5px 0 2px 0;">'
+                                        f'<span style="background:#1B9FD8;color:#fff;'
+                                        f'border-radius:50%;padding:1px 7px;margin-right:5px;'
+                                        f'font-size:11px;font-weight:700;">{idx + 1}</span>'
+                                        f'{short}</div>',
                                         unsafe_allow_html=True
                                     )
-                                short = (fi["name"][:22] + "…") if len(fi["name"]) > 22 else fi["name"]
-                                st.markdown(
-                                    f'<div style="font-size:12px;font-weight:600;color:#C8E4F0;'
-                                    f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
-                                    f'margin:5px 0 2px 0;">'
-                                    f'<span style="background:#1B9FD8;color:#fff;'
-                                    f'border-radius:50%;padding:1px 7px;margin-right:5px;'
-                                    f'font-size:11px;font-weight:700;">{idx + 1}</span>'
-                                    f'{short}</div>',
-                                    unsafe_allow_html=True
-                                )
-                                st.caption(f"📄 {fi['pages']} pág. · 💾 {fi['size']}")
+                                    st.caption(f"📄 {fi['pages']} pág. · 💾 {fi['size']}")
 
-            # Sección inferior: nombre + Nexíficar
-            st.markdown('<div class="nx-export-bar">', unsafe_allow_html=True)
-            st.markdown('<div class="nx-export-label">💾 Nombre del PDF final y exportación</div>',
-                        unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+                # Sección inferior: nombre + Nexíficar
+                st.markdown('<div class="nx-export-bar">', unsafe_allow_html=True)
+                st.markdown('<div class="nx-export-label">💾 Nombre del PDF final y exportación</div>',
+                            unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
-            col_name, col_btn = st.columns([3, 1])
-            with col_name:
-                nombre_final = st.text_input(
-                    "Nombre del archivo unificado:",
-                    "Documento_Unificado.pdf",
-                    label_visibility="collapsed",
-                    placeholder="Nombre_del_archivo_final.pdf"
-                )
-                if not nombre_final.lower().endswith(".pdf"):
-                    nombre_final += ".pdf"
-            with col_btn:
-                st.markdown("<br>", unsafe_allow_html=True)
-                nexificar = st.button(
-                    f"🔗 Nexíficar {len(orden)} PDFs",
+                col_name, col_btn = st.columns([3, 1])
+                with col_name:
+                    nombre_final = st.text_input(
+                        "Nombre del archivo unificado:",
+                        "Documento_Unificado.pdf",
+                        label_visibility="collapsed",
+                        placeholder="Nombre_del_archivo_final.pdf"
+                    )
+                    if not nombre_final.lower().endswith(".pdf"):
+                        nombre_final += ".pdf"
+                with col_btn:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    nexificar = st.button(
+                        f"🔗 Nexíficar {len(orden)} PDFs",
+                        type="primary",
+                        use_container_width=True,
+                        disabled=(len(orden) == 0)
+                    )
+
+                if nexificar:
+                    if not orden:
+                        st.warning("⚠️ No hay documentos para unir.")
+                    else:
+                        with st.spinner("Nexíficando documentos conservando la calidad original…"):
+                            try:
+                                merger = PdfMerger()
+                                for n in orden:
+                                    a = file_info_map[n]["arch"]
+                                    a.seek(0)
+                                    merger.append(a)
+                                buf = BytesIO()
+                                merger.write(buf)
+                                merger.close()
+                                buf.seek(0)
+                                st.session_state.nx_buffer = buf.getvalue()
+                                st.session_state.nx_nombre = nombre_final
+                                st.session_state.nx_done   = True
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Error al unir los archivos: {e}")
+
+            # ── PASO 3: éxito + descarga ──────────────────────────────────────
+            else:
+                total = len(orden)
+                st.markdown(f"""
+                <div class="nx-success-card">
+                    <div class="nx-success-icon">🎉</div>
+                    <div class="nx-success-title">¡Nexíficación completada!</div>
+                    <div class="nx-success-sub">
+                        {total} PDF{'s' if total != 1 else ''} unidos en
+                        <strong>{st.session_state.nx_nombre}</strong>
+                    </div>
+                </div>""", unsafe_allow_html=True)
+
+                st.download_button(
+                    label="⬇️ Descargar PDF Unificado",
+                    data=st.session_state.nx_buffer,
+                    file_name=st.session_state.nx_nombre,
+                    mime="application/pdf",
                     type="primary",
-                    use_container_width=True,
-                    disabled=(len(orden) == 0)
+                    use_container_width=True
                 )
 
-            if nexificar:
-                if not orden:
-                    st.warning("⚠️ No hay documentos para unir.")
-                else:
-                    with st.spinner("Nexíficando documentos conservando la calidad original…"):
-                        try:
-                            merger = PdfMerger()
-                            for n in orden:
-                                a = file_info_map[n]["arch"]
-                                a.seek(0)
-                                merger.append(a)
-                            buf = BytesIO()
-                            merger.write(buf)
-                            merger.close()
-                            buf.seek(0)
-                            st.session_state.nx_buffer = buf.getvalue()
-                            st.session_state.nx_nombre = nombre_final
-                            st.session_state.nx_done   = True
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Error al unir los archivos: {e}")
-
-        # ── PASO 3: éxito + descarga ──────────────────────────────────────
-        else:
-            total = len(orden)
-            st.markdown(f"""
-            <div class="nx-success-card">
-                <div class="nx-success-icon">🎉</div>
-                <div class="nx-success-title">¡Nexíficación completada!</div>
-                <div class="nx-success-sub">
-                    {total} PDF{'s' if total != 1 else ''} unidos en
-                    <strong>{st.session_state.nx_nombre}</strong>
-                </div>
-            </div>""", unsafe_allow_html=True)
-
-            st.download_button(
-                label="⬇️ Descargar PDF Unificado",
-                data=st.session_state.nx_buffer,
-                file_name=st.session_state.nx_nombre,
-                mime="application/pdf",
-                type="primary",
-                use_container_width=True
-            )
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔄 Nexíficar otros PDFs", use_container_width=True):
-                st.session_state.nx_done       = False
-                st.session_state.nx_buffer     = None
-                st.session_state.nx_order      = []
-                st.session_state.nx_files_sig  = ""
-                st.session_state.nx_editor_ver = 0
-                st.rerun()
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🔄 Nexíficar otros PDFs", use_container_width=True):
+                    st.session_state.nx_done       = False
+                    st.session_state.nx_buffer     = None
+                    st.session_state.nx_order      = []
+                    st.session_state.nx_files_sig  = ""
+                    st.session_state.nx_editor_ver = 0
+                    st.rerun()
 
 
 # ==========================================
@@ -1553,7 +1589,7 @@ with tabs[2]:
             st.markdown("<br>", unsafe_allow_html=True)
 
             # ── Layout principal: grid + panel lateral ─────────────────────
-            grid_col, panel_col = st.columns([4, 1])
+            grid_col, panel_col = st.columns([3, 1])
             mode = st.session_state.sp_mode
             _SP_SEC = ["#1B9FD8","#27AE60","#E74C3C","#F39C12","#9B59B6","#1ABC9C","#E91E63","#FF9800"]
 
@@ -1755,26 +1791,38 @@ with tabs[2]:
 # TAB 3 — COMPRIMIR PDF (próximamente)
 # ==========================================
 with tabs[3]:
-    st.markdown("""
+    _cs3_col, _cs3_panel = st.columns([3, 1])
+    with _cs3_col:
+        st.markdown("""
     <div class="nx-coming-soon">
         <div class="nx-cs-icon">🗜️</div>
         <div class="nx-cs-title">Comprimir PDF</div>
         <div class="nx-cs-sub">Reduce el tamaño de tus PDFs sin perder calidad visible.</div>
         <div class="nx-cs-badge">Próximamente</div>
     </div>""", unsafe_allow_html=True)
+    with _cs3_panel:
+        with st.container(border=True):
+            st.markdown('<div style="font-size:14px;font-weight:700;color:#C8E4F0;margin-bottom:8px;">🗜️ Comprimir PDF</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:12px;color:#2A4A6A;">Disponible próximamente.</div>', unsafe_allow_html=True)
 
 
 # ==========================================
 # TAB 4 — MERGE PDF (próximamente)
 # ==========================================
 with tabs[4]:
-    st.markdown("""
+    _cs4_col, _cs4_panel = st.columns([3, 1])
+    with _cs4_col:
+        st.markdown("""
     <div class="nx-coming-soon">
         <div class="nx-cs-icon">🔗</div>
         <div class="nx-cs-title">Merge PDF</div>
         <div class="nx-cs-sub">Combina PDFs con opciones avanzadas de intercalado y portada.</div>
         <div class="nx-cs-badge">Próximamente</div>
     </div>""", unsafe_allow_html=True)
+    with _cs4_panel:
+        with st.container(border=True):
+            st.markdown('<div style="font-size:14px;font-weight:700;color:#C8E4F0;margin-bottom:8px;">🔗 Merge PDF</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:12px;color:#2A4A6A;">Disponible próximamente.</div>', unsafe_allow_html=True)
 
 
 # ==========================================
@@ -1825,7 +1873,7 @@ with tabs[5]:
             st.session_state.ed_cur_page = cur_page
 
             # ── Render background image (base64 PNG) for HTML canvas ────────
-            CANVAS_W = 620
+            CANVAS_W = 800
             _doc_ed = fitz.open(stream=ed_bytes, filetype="pdf")
             _pg_ed  = _doc_ed[cur_page]
             pw_r    = _pg_ed.rect.width
@@ -1851,7 +1899,7 @@ with tabs[5]:
             )
 
             # ── Layout 3 columnas ────────────────────────────────────────────
-            nav_col, canvas_col, props_col = st.columns([1, 3, 1.5])
+            nav_col, canvas_col, props_col = st.columns([1, 4, 1.5])
 
             # ── Columna izquierda: miniaturas de páginas ───────────────────
             with nav_col:
@@ -2045,129 +2093,207 @@ with tabs[6]:
         if not FITZ_OK:
             st.error("⚠️ PyMuPDF no está instalado.")
         else:
-            ep_bytes = ep_file.read()
-            thumbs_ep, n_pages_ep = _ensure_thumbs("ep", ep_bytes, "ep_sel")
-            n_sel = len(st.session_state.ep_sel)
+            # ── Layout 2 columnas ─────────────────────────────────────────
+            _ep_col, _ep_panel = st.columns([3, 1])
 
-            # ── Resultado listo: mostrar descarga + reinicio ───────────────
-            if st.session_state.ep_result:
-                ep_pages_kept = n_pages_ep - len(st.session_state.ep_sel)
-                ep_name = ep_file.name.replace(".pdf", "_sin_paginas.pdf")
-                st.markdown("""
-                <div class="nx-success-card">
-                    <div class="nx-success-icon">✅</div>
-                    <div class="nx-success-title">¡Páginas eliminadas!</div>
-                    <div class="nx-success-sub">El PDF resultante está listo para descargar.</div>
-                </div>""", unsafe_allow_html=True)
-                st.download_button(
-                    label=f"⬇️ Descargar PDF ({ep_pages_kept} páginas)",
-                    data=st.session_state.ep_result,
-                    file_name=ep_name,
-                    mime="application/pdf",
-                    type="primary",
-                    use_container_width=True
-                )
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🔄 Eliminar páginas de otro PDF", use_container_width=True,
-                             key="ep_reset"):
-                    st.session_state.ep_result = None
-                    st.session_state.ep_sel    = set()
-                    st.session_state.ep_sig    = ""
-                    st.session_state.ep_thumbs = []
-                    st.session_state.ep_n      = 0
-                    st.rerun()
-
-            else:
-                # ── Selector de rango ──────────────────────────────────────
-                st.markdown(
-                    '<div class="nx-section">🎯 Selección rápida por rango</div>',
-                    unsafe_allow_html=True
-                )
-                _rc1, _rc2, _rc3, _rc4 = st.columns([1, 1, 1, 1])
-                with _rc1:
-                    ep_from = st.number_input("Desde página", 1, n_pages_ep, 1, key="ep_from")
-                with _rc2:
-                    ep_to   = st.number_input("Hasta página", 1, n_pages_ep, n_pages_ep, key="ep_to")
-                with _rc3:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("Seleccionar rango", use_container_width=True, key="ep_sel_range"):
-                        for i in range(int(ep_from)-1, int(ep_to)):
-                            st.session_state.ep_sel.add(i)
-                        st.rerun()
-                with _rc4:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("Deseleccionar rango", use_container_width=True, key="ep_desel_range"):
-                        for i in range(int(ep_from)-1, int(ep_to)):
-                            st.session_state.ep_sel.discard(i)
-                        st.rerun()
-
-                # ── Barra de estado + acciones globales ────────────────────
-                st.markdown(
-                    '<div class="nx-section">🗑️ Selecciona páginas para eliminar</div>',
-                    unsafe_allow_html=True
-                )
-                col_info, col_all, col_none = st.columns([3, 1, 1])
-                with col_info:
-                    if n_sel == 0:
-                        sel_txt = f"Ninguna página seleccionada de {n_pages_ep}"
-                    else:
-                        sel_txt = (f"**{n_sel}** página{'s' if n_sel!=1 else ''} "
-                                   f"seleccionada{'s' if n_sel!=1 else ''} para eliminar")
-                    st.info(sel_txt, icon="🗑️")
-                with col_all:
-                    if st.button("Seleccionar todas", use_container_width=True, key="ep_all"):
-                        st.session_state.ep_sel = set(range(n_pages_ep))
-                        st.rerun()
-                with col_none:
-                    if st.button("Deseleccionar todas", use_container_width=True, key="ep_none"):
-                        st.session_state.ep_sel = set()
-                        st.rerun()
-
-                # ── Grid de miniaturas (6 columnas) ────────────────────────
-                COLS = 6
-                for row_start in range(0, n_pages_ep, COLS):
-                    cols_ep = st.columns(COLS)
-                    for ci, pi in enumerate(range(row_start, min(row_start + COLS, n_pages_ep))):
-                        is_sel = pi in st.session_state.ep_sel
-                        with cols_ep[ci]:
-                            st.markdown(
-                                _thumb_card(thumbs_ep[pi], pi + 1,
-                                            selected=is_sel, mode="delete"),
-                                unsafe_allow_html=True
-                            )
-                            if is_sel:
-                                if st.button("✕", key=f"ep_{pi}", use_container_width=True):
-                                    st.session_state.ep_sel.discard(pi)
-                                    st.rerun()
-                            else:
-                                if st.button("☐", key=f"ep_{pi}", use_container_width=True):
-                                    st.session_state.ep_sel.add(pi)
-                                    st.rerun()
-
-                # ── Acción ─────────────────────────────────────────────────
-                st.markdown("---")
-                pages_to_keep = n_pages_ep - n_sel
-                if n_sel == 0:
-                    st.info("Selecciona al menos una página para eliminar.", icon="ℹ️")
-                elif pages_to_keep == 0:
-                    st.warning("⚠️ No puedes eliminar todas las páginas. Debes conservar al menos una.")
-                else:
-                    if st.button(
-                        f"🗑️ Eliminar {n_sel} página{'s' if n_sel>1 else ''} seleccionada{'s' if n_sel>1 else ''} "
-                        f"(quedan {pages_to_keep})",
-                        type="primary", use_container_width=True, key="ep_do_delete"
-                    ):
-                        with st.spinner("Generando PDF…"):
-                            try:
-                                reader = PdfReader(BytesIO(ep_bytes))
-                                writer = PdfWriter()
-                                for pi in range(n_pages_ep):
-                                    if pi not in st.session_state.ep_sel:
-                                        writer.add_page(reader.pages[pi])
-                                ep_buf = BytesIO()
-                                writer.write(ep_buf)
-                                ep_buf.seek(0)
-                                st.session_state.ep_result = ep_buf.getvalue()
+            # ── Panel lateral derecho ─────────────────────────────────────
+            with _ep_panel:
+                with st.container(border=True):
+                    st.markdown(
+                        '<div style="font-size:15px;font-weight:700;color:#C8E4F0;margin-bottom:12px;">🗑️ Eliminar páginas</div>',
+                        unsafe_allow_html=True
+                    )
+                    _ep_n_pag = st.session_state.get("ep_n", 0)
+                    if _ep_n_pag > 0:
+                        st.markdown(
+                            f'<div style="font-size:12px;color:#4A7A9C;margin-bottom:4px;">Páginas totales: <strong style="color:#C8E4F0;">{_ep_n_pag}</strong></div>',
+                            unsafe_allow_html=True
+                        )
+                    st.markdown('<div style="font-size:11px;color:#4A7A9C;margin:10px 0 4px 0;">Páginas para quitar:</div>', unsafe_allow_html=True)
+                    _ep_rng = st.text_input(
+                        "Páginas para quitar",
+                        key="ep_rng_txt",
+                        placeholder="ejemplo: 1,5-8",
+                        label_visibility="collapsed"
+                    )
+                    _ep_n_pag2 = st.session_state.get("ep_n", 0)
+                    if _ep_rng and _ep_n_pag2 > 0:
+                        try:
+                            _new_sel = set()
+                            for _part in _ep_rng.replace(" ", "").split(","):
+                                if "-" in _part:
+                                    _a, _b = _part.split("-", 1)
+                                    _new_sel.update(range(int(_a)-1, int(_b)))
+                                elif _part:
+                                    _new_sel.add(int(_part)-1)
+                            _new_sel = {p for p in _new_sel if 0 <= p < _ep_n_pag2}
+                            if _new_sel != st.session_state.ep_sel:
+                                st.session_state.ep_sel = _new_sel
                                 st.rerun()
-                            except Exception as e:
-                                st.error(f"Error: {e}")
+                        except Exception:
+                            st.warning("Formato inválido", icon="⚠️")
+                    _ep_n_sel2 = len(st.session_state.ep_sel)
+                    _ep_n_pag3 = st.session_state.get("ep_n", 0)
+                    st.markdown(
+                        f'<div style="font-size:12px;color:{"#E74C3C" if _ep_n_sel2>0 else "#4A7A9C"};margin:10px 0;">'
+                        f'{"🗑️ " if _ep_n_sel2>0 else ""}{_ep_n_sel2} página{"s" if _ep_n_sel2!=1 else ""} seleccionada{"s" if _ep_n_sel2!=1 else ""}</div>',
+                        unsafe_allow_html=True
+                    )
+                    _ep_keep2 = _ep_n_pag3 - _ep_n_sel2
+                    if _ep_n_sel2 > 0 and _ep_keep2 > 0 and not st.session_state.get("ep_result"):
+                        if st.button(
+                            f"🗑️ Eliminar {_ep_n_sel2} página{'s' if _ep_n_sel2>1 else ''}",
+                            type="primary", use_container_width=True, key="ep_do_delete_panel",
+                        ):
+                            with st.spinner("Generando PDF…"):
+                                try:
+                                    import io as _io
+                                    _ep_raw = st.session_state.get("_ep_bytes_cache", b"")
+                                    if _ep_raw:
+                                        _rdr2 = PdfReader(BytesIO(_ep_raw))
+                                        _wrt2 = PdfWriter()
+                                        _ep_tot = _ep_n_pag3
+                                        for _pi2 in range(_ep_tot):
+                                            if _pi2 not in st.session_state.ep_sel:
+                                                _wrt2.add_page(_rdr2.pages[_pi2])
+                                        _buf2 = BytesIO()
+                                        _wrt2.write(_buf2)
+                                        _buf2.seek(0)
+                                        st.session_state.ep_result = _buf2.getvalue()
+                                        st.rerun()
+                                except Exception as _e2:
+                                    st.error(f"Error: {_e2}")
+                    elif _ep_n_sel2 == 0:
+                        st.info("Selecciona páginas.", icon="ℹ️")
+                    elif _ep_n_pag3 > 0 and _ep_keep2 == 0:
+                        st.warning("Conserva al menos una.", icon="⚠️")
+
+            # ── Contenido principal (izquierda) ───────────────────────────
+            with _ep_col:
+
+                ep_bytes = ep_file.read()
+                thumbs_ep, n_pages_ep = _ensure_thumbs("ep", ep_bytes, "ep_sel")
+                n_sel = len(st.session_state.ep_sel)
+
+                # ── Resultado listo: mostrar descarga + reinicio ───────────────
+                if st.session_state.ep_result:
+                    ep_pages_kept = n_pages_ep - len(st.session_state.ep_sel)
+                    ep_name = ep_file.name.replace(".pdf", "_sin_paginas.pdf")
+                    st.markdown("""
+                    <div class="nx-success-card">
+                        <div class="nx-success-icon">✅</div>
+                        <div class="nx-success-title">¡Páginas eliminadas!</div>
+                        <div class="nx-success-sub">El PDF resultante está listo para descargar.</div>
+                    </div>""", unsafe_allow_html=True)
+                    st.download_button(
+                        label=f"⬇️ Descargar PDF ({ep_pages_kept} páginas)",
+                        data=st.session_state.ep_result,
+                        file_name=ep_name,
+                        mime="application/pdf",
+                        type="primary",
+                        use_container_width=True
+                    )
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🔄 Eliminar páginas de otro PDF", use_container_width=True,
+                                 key="ep_reset"):
+                        st.session_state.ep_result = None
+                        st.session_state.ep_sel    = set()
+                        st.session_state.ep_sig    = ""
+                        st.session_state.ep_thumbs = []
+                        st.session_state.ep_n      = 0
+                        st.rerun()
+
+                else:
+                    # ── Selector de rango ──────────────────────────────────────
+                    st.markdown(
+                        '<div class="nx-section">🎯 Selección rápida por rango</div>',
+                        unsafe_allow_html=True
+                    )
+                    _rc1, _rc2, _rc3, _rc4 = st.columns([1, 1, 1, 1])
+                    with _rc1:
+                        ep_from = st.number_input("Desde página", 1, n_pages_ep, 1, key="ep_from")
+                    with _rc2:
+                        ep_to   = st.number_input("Hasta página", 1, n_pages_ep, n_pages_ep, key="ep_to")
+                    with _rc3:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("Seleccionar rango", use_container_width=True, key="ep_sel_range"):
+                            for i in range(int(ep_from)-1, int(ep_to)):
+                                st.session_state.ep_sel.add(i)
+                            st.rerun()
+                    with _rc4:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("Deseleccionar rango", use_container_width=True, key="ep_desel_range"):
+                            for i in range(int(ep_from)-1, int(ep_to)):
+                                st.session_state.ep_sel.discard(i)
+                            st.rerun()
+
+                    # ── Barra de estado + acciones globales ────────────────────
+                    st.markdown(
+                        '<div class="nx-section">🗑️ Selecciona páginas para eliminar</div>',
+                        unsafe_allow_html=True
+                    )
+                    col_info, col_all, col_none = st.columns([3, 1, 1])
+                    with col_info:
+                        if n_sel == 0:
+                            sel_txt = f"Ninguna página seleccionada de {n_pages_ep}"
+                        else:
+                            sel_txt = (f"**{n_sel}** página{'s' if n_sel!=1 else ''} "
+                                       f"seleccionada{'s' if n_sel!=1 else ''} para eliminar")
+                        st.info(sel_txt, icon="🗑️")
+                    with col_all:
+                        if st.button("Seleccionar todas", use_container_width=True, key="ep_all"):
+                            st.session_state.ep_sel = set(range(n_pages_ep))
+                            st.rerun()
+                    with col_none:
+                        if st.button("Deseleccionar todas", use_container_width=True, key="ep_none"):
+                            st.session_state.ep_sel = set()
+                            st.rerun()
+
+                    # ── Grid de miniaturas (6 columnas) ────────────────────────
+                    COLS = 6
+                    for row_start in range(0, n_pages_ep, COLS):
+                        cols_ep = st.columns(COLS)
+                        for ci, pi in enumerate(range(row_start, min(row_start + COLS, n_pages_ep))):
+                            is_sel = pi in st.session_state.ep_sel
+                            with cols_ep[ci]:
+                                st.markdown(
+                                    _thumb_card(thumbs_ep[pi], pi + 1,
+                                                selected=is_sel, mode="delete"),
+                                    unsafe_allow_html=True
+                                )
+                                if is_sel:
+                                    if st.button("✕", key=f"ep_{pi}", use_container_width=True):
+                                        st.session_state.ep_sel.discard(pi)
+                                        st.rerun()
+                                else:
+                                    if st.button("☐", key=f"ep_{pi}", use_container_width=True):
+                                        st.session_state.ep_sel.add(pi)
+                                        st.rerun()
+
+                    # ── Acción ─────────────────────────────────────────────────
+                    st.markdown("---")
+                    pages_to_keep = n_pages_ep - n_sel
+                    if n_sel == 0:
+                        st.info("Selecciona al menos una página para eliminar.", icon="ℹ️")
+                    elif pages_to_keep == 0:
+                        st.warning("⚠️ No puedes eliminar todas las páginas. Debes conservar al menos una.")
+                    else:
+                        if st.button(
+                            f"🗑️ Eliminar {n_sel} página{'s' if n_sel>1 else ''} seleccionada{'s' if n_sel>1 else ''} "
+                            f"(quedan {pages_to_keep})",
+                            type="primary", use_container_width=True, key="ep_do_delete"
+                        ):
+                            with st.spinner("Generando PDF…"):
+                                try:
+                                    reader = PdfReader(BytesIO(ep_bytes))
+                                    writer = PdfWriter()
+                                    for pi in range(n_pages_ep):
+                                        if pi not in st.session_state.ep_sel:
+                                            writer.add_page(reader.pages[pi])
+                                    ep_buf = BytesIO()
+                                    writer.write(ep_buf)
+                                    ep_buf.seek(0)
+                                    st.session_state.ep_result = ep_buf.getvalue()
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error: {e}")
