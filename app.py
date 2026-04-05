@@ -440,6 +440,50 @@ def _thumb_card(b64: str, page_num: int,
             f'</div>')
 
 
+def _parse_fabric_color(color_str):
+    """Parse CSS/Fabric.js color string to fitz (r, g, b) tuple, or None for transparent."""
+    if not color_str or color_str in ("", "transparent"):
+        return None
+    cs = str(color_str).strip()
+    try:
+        if cs.startswith("#") and len(cs) >= 7:
+            return (int(cs[1:3],16)/255, int(cs[3:5],16)/255, int(cs[5:7],16)/255)
+        if "rgba" in cs:
+            p = cs[cs.index("(")+1:cs.rindex(")")].split(",")
+            if float(p[3].strip()) < 0.03:
+                return None
+            return (float(p[0])/255, float(p[1])/255, float(p[2].strip())/255)
+        if "rgb" in cs:
+            p = cs[cs.index("(")+1:cs.rindex(")")].split(",")
+            return (float(p[0])/255, float(p[1])/255, float(p[2].strip())/255)
+    except Exception:
+        pass
+    return (0, 0, 0)
+
+
+def _extract_path_pts(obj, sx, sy):
+    """Extract list of fitz.Point from a Fabric.js freedraw path object."""
+    pts = []
+    path_data = obj.get("path", [])
+    off_x = obj.get("left", 0)
+    off_y = obj.get("top", 0)
+    po = obj.get("pathOffset")
+    if isinstance(po, dict):
+        off_x += po.get("x", 0)
+        off_y += po.get("y", 0)
+    for cmd in path_data:
+        if not cmd:
+            continue
+        t = cmd[0]
+        if t in ("M", "L") and len(cmd) >= 3:
+            pts.append(fitz.Point((off_x + cmd[1]) * sx, (off_y + cmd[2]) * sy))
+        elif t == "Q" and len(cmd) >= 5:
+            pts.append(fitz.Point((off_x + cmd[3]) * sx, (off_y + cmd[4]) * sy))
+        elif t == "C" and len(cmd) >= 7:
+            pts.append(fitz.Point((off_x + cmd[5]) * sx, (off_y + cmd[6]) * sy))
+    return pts
+
+
 # ==========================================
 # LOGO Y DETECCIÓN DE RUTA
 # ==========================================
@@ -1241,14 +1285,36 @@ with tabs[4]:
 
 
 # ==========================================
-# TAB 5 — EDITAR PDF
+# TAB 5 — EDITAR PDF (Canvas Visual)
 # ==========================================
 with tabs[5]:
 
+    # ── Importaciones opcionales ───────────────────────────────────────────
+    try:
+        from streamlit_drawable_canvas import st_canvas as _st_canvas
+        _CANVAS_PKG = True
+    except ImportError:
+        _CANVAS_PKG = False
+
+    try:
+        from PIL import Image as _PILImg
+        _PIL_PKG = True
+    except ImportError:
+        _PIL_PKG = False
+
     for _k, _v in [
         ("ed_sig", ""), ("ed_thumbs", []), ("ed_n", 0),
-        ("ed_elements", []), ("ed_cur_page", 0),
-        ("ed_tool", "text"), ("ed_result", None),
+        ("ed_text_elems", []),
+        ("ed_cur_page", 0),
+        ("ed_draw_mode", "rect"),
+        ("ed_stroke_c", "#E74C3C"),
+        ("ed_fill_hex", "#FFCC00"),
+        ("ed_has_fill", False),
+        ("ed_stroke_w", 2),
+        ("ed_font_name", "Helvetica"),
+        ("ed_font_sz", 14),
+        ("ed_txt_color", "#000000"),
+        ("ed_result", None),
     ]:
         if _k not in st.session_state:
             st.session_state[_k] = _v
@@ -1256,314 +1322,367 @@ with tabs[5]:
     st.markdown("""
     <div class="nx-page-header">
         <div class="nx-page-title">✏️ Editar PDF</div>
-        <div class="nx-page-sub">Agrega <strong>texto</strong> y <strong>rectángulos</strong>
-        sobre cualquier página con vista previa en tiempo real.
-        Elimina elementos y descarga el PDF final.</div>
+        <div class="nx-page-sub">Editor visual interactivo: dibuja <strong>rectángulos</strong>,
+        <strong>elipses</strong>, <strong>trazos libres</strong> y <strong>líneas</strong>
+        directamente sobre el PDF. Agrega texto en posición exacta y descarga el resultado.</div>
     </div>
     """, unsafe_allow_html=True)
 
     ed_file = st.file_uploader("Sube el PDF a editar", type=["pdf"], key="ed_uploader")
 
     if not ed_file:
-        st.session_state.ed_result   = None
-        st.session_state.ed_elements = []
-        st.session_state.ed_cur_page = 0
+        st.session_state.ed_result     = None
+        st.session_state.ed_text_elems = []
+        st.session_state.ed_cur_page   = 0
         st.markdown("""
         <div class="nx-empty">
             <div class="nx-empty-icon">✏️</div>
             <div class="nx-empty-text">Sube un PDF para empezar a editarlo</div>
-            <div class="nx-empty-sub">Agrega texto y rectángulos sobre cualquier página</div>
+            <div class="nx-empty-sub">Dibuja sobre el PDF y agrega texto en posición exacta</div>
         </div>""", unsafe_allow_html=True)
     else:
         if not FITZ_OK:
             st.error("⚠️ PyMuPDF no está instalado.")
+        elif not _CANVAS_PKG:
+            st.error("⚠️ `streamlit-drawable-canvas` no está instalado. "
+                     "Asegúrate de que está en requirements.txt y redespliega la app.")
+        elif not _PIL_PKG:
+            st.error("⚠️ `Pillow` no está instalado.")
         else:
             ed_bytes = ed_file.read()
             thumbs_ed, n_pages_ed = _ensure_thumbs("ed", ed_bytes)
 
-            # Clamp current page index
-            if st.session_state.ed_cur_page >= n_pages_ed:
-                st.session_state.ed_cur_page = 0
-            cur_page = st.session_state.ed_cur_page
+            cur_page = max(0, min(st.session_state.ed_cur_page, n_pages_ed - 1))
+            st.session_state.ed_cur_page = cur_page
 
-            # Get page dimensions
-            _doc_dim = fitz.open(stream=ed_bytes, filetype="pdf")
-            pw = int(_doc_dim[cur_page].rect.width)
-            ph = int(_doc_dim[cur_page].rect.height)
-            _doc_dim.close()
+            # ── Render página actual como imagen PIL para el canvas ─────────
+            CANVAS_W = 680
+            _doc_ed = fitz.open(stream=ed_bytes, filetype="pdf")
+            _pg_ed  = _doc_ed[cur_page]
+            pw_r    = _pg_ed.rect.width
+            ph_r    = _pg_ed.rect.height
+            canvas_h = int(ph_r * CANVAS_W / pw_r)
+            _pix_bg  = _pg_ed.get_pixmap(
+                matrix=fitz.Matrix(CANVAS_W / pw_r, canvas_h / ph_r), alpha=False
+            )
+            _doc_ed.close()
+            _bg_pil = _PILImg.frombytes("RGB", [_pix_bg.width, _pix_bg.height], _pix_bg.samples)
 
             # ── Layout 3 columnas ──────────────────────────────────────────
-            nav_col, edit_col, elem_col = st.columns([1, 3, 1.5])
+            nav_col, canvas_col, props_col = st.columns([1, 3, 1.5])
 
-            # ── Columna izquierda: navegación de páginas ───────────────────
+            # ── Columna izquierda: miniaturas de páginas ───────────────────
             with nav_col:
                 st.markdown(
                     '<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
-                    'text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Páginas</div>',
+                    'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Páginas</div>',
                     unsafe_allow_html=True
                 )
                 for pi in range(n_pages_ed):
-                    is_cur = pi == cur_page
-                    n_el   = sum(1 for e in st.session_state.ed_elements if e["page"] == pi)
-                    _bdr_n = "2px solid #1B9FD8" if is_cur else "1px solid rgba(27,159,216,0.15)"
-                    _bg_n  = "rgba(27,159,216,0.12)" if is_cur else "#0A1626"
-                    _badge_n = (f'<div style="position:absolute;bottom:4px;right:4px;'
-                                f'background:#1B9FD8;color:#fff;font-size:9px;font-weight:700;'
-                                f'padding:1px 5px;border-radius:6px;">{n_el}</div>') if n_el > 0 else ""
+                    _is_cur = pi == cur_page
+                    _n_txt  = sum(1 for e in st.session_state.ed_text_elems if e["page"] == pi)
+                    _cv_raw = st.session_state.get(f"ed_canvas_{pi}")
+                    _n_shp  = len(_cv_raw.get("objects", [])) if isinstance(_cv_raw, dict) else 0
+                    _n_el   = _n_txt + _n_shp
+                    _bdr_pn = "2px solid #1B9FD8" if _is_cur else "1px solid rgba(27,159,216,0.15)"
+                    _bg_pn  = "rgba(27,159,216,0.12)" if _is_cur else "#0A1626"
+                    _bdg_pn = (f'<div style="position:absolute;bottom:4px;right:4px;background:#1B9FD8;'
+                                f'color:#fff;font-size:9px;font-weight:700;padding:1px 5px;'
+                                f'border-radius:5px;">{_n_el}</div>') if _n_el > 0 else ""
                     st.markdown(
-                        f'<div style="border:{_bdr_n};border-radius:8px;padding:4px;'
-                        f'background:{_bg_n};position:relative;margin-bottom:4px;">'
+                        f'<div style="border:{_bdr_pn};border-radius:8px;padding:4px;'
+                        f'background:{_bg_pn};position:relative;margin-bottom:4px;">'
                         f'<img src="data:image/png;base64,{thumbs_ed[pi]}" '
-                        f'style="width:100%;border-radius:4px;display:block;" draggable="false"/>'
-                        f'{_badge_n}'
+                        f'style="width:100%;border-radius:4px;display:block;"/>'
+                        f'{_bdg_pn}'
                         f'<div style="text-align:center;font-size:10px;color:#2E5878;'
                         f'margin-top:3px;font-weight:600;">{pi+1}</div></div>',
                         unsafe_allow_html=True
                     )
-                    if not is_cur:
+                    if not _is_cur:
                         if st.button("Ver", key=f"ed_nav_{pi}", use_container_width=True):
                             st.session_state.ed_cur_page = pi
                             st.rerun()
 
-            # ── Columna central: herramientas + formulario + vista previa ──
-            with edit_col:
-                # Toolbar
-                tool_col1, tool_col2, tool_col3 = st.columns([1, 1, 1])
-                with tool_col1:
-                    _t_act = st.session_state.ed_tool == "text"
+            # ── Columna derecha: herramientas + propiedades + guardar ──────
+            with props_col:
+                st.markdown(
+                    '<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
+                    'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Herramienta</div>',
+                    unsafe_allow_html=True
+                )
+                _tools_ed = [
+                    ("rect",      "□  Rectángulo"),
+                    ("circle",    "○  Elipse"),
+                    ("freedraw",  "✏️  Trazo libre"),
+                    ("line",      "↗  Línea"),
+                    ("transform", "✥  Mover / Redim"),
+                    ("text",      "T   Texto"),
+                ]
+                for _tm, _tlbl in _tools_ed:
+                    _is_act_t = st.session_state.ed_draw_mode == _tm
                     if st.button(
-                        "✍️ Texto ✓" if _t_act else "✍️ Texto",
-                        key="ed_tool_text", use_container_width=True,
-                        type="primary" if _t_act else "secondary"
+                        _tlbl, key=f"ed_tool_{_tm}",
+                        use_container_width=True,
+                        type="primary" if _is_act_t else "secondary"
                     ):
-                        st.session_state.ed_tool = "text"
-                        st.rerun()
-                with tool_col2:
-                    _r_act = st.session_state.ed_tool == "rect"
-                    if st.button(
-                        "□ Rectángulo ✓" if _r_act else "□ Rectángulo",
-                        key="ed_tool_rect", use_container_width=True,
-                        type="primary" if _r_act else "secondary"
-                    ):
-                        st.session_state.ed_tool = "rect"
-                        st.rerun()
-                with tool_col3:
-                    _els_cur = [e for e in st.session_state.ed_elements if e["page"] == cur_page]
-                    if st.button("🗑️ Eliminar último", key="ed_del_last",
-                                 use_container_width=True, disabled=len(_els_cur) == 0):
-                        for _i in range(len(st.session_state.ed_elements) - 1, -1, -1):
-                            if st.session_state.ed_elements[_i]["page"] == cur_page:
-                                st.session_state.ed_elements.pop(_i)
-                                break
+                        st.session_state.ed_draw_mode = _tm
                         st.rerun()
 
-                st.markdown('<hr style="border-color:rgba(27,159,216,0.1);margin:8px 0 14px 0;"/>',
-                            unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                _dm = st.session_state.ed_draw_mode
 
-                # ── Formulario texto ───────────────────────────────────────
-                if st.session_state.ed_tool == "text":
+                # ── Propiedades según herramienta ────────────────────────
+                if _dm == "text":
                     st.markdown(
-                        '<div style="font-size:12px;font-weight:700;color:#4A7A9C;margin-bottom:10px;">'
-                        'Configurar texto</div>', unsafe_allow_html=True
+                        '<div style="font-size:11px;font-weight:700;color:#4A7A9C;'
+                        'margin-bottom:8px;">Configurar texto</div>', unsafe_allow_html=True
                     )
-                    ed_txt = st.text_area("Texto", value="", height=70, key="ed_txt_val",
-                                          placeholder="Escribe el texto a insertar…")
-                    _tc1, _tc2, _tc3 = st.columns([2, 1, 1])
-                    with _tc1:
-                        ed_font_sel = st.selectbox("Fuente", ["Helvetica", "Times", "Courier"],
-                                                    key="ed_font")
-                    with _tc2:
-                        ed_fsize = st.number_input("Tamaño", 6, 120, 14, key="ed_fsize")
-                    with _tc3:
-                        ed_color = st.color_picker("Color", "#000000", key="ed_color")
-                    _tc4, _tc5 = st.columns([1, 1])
-                    with _tc4:
-                        ed_x = st.number_input("X →", 0, pw, pw // 6, key="ed_x")
-                    with _tc5:
-                        ed_y = st.number_input("Y ↓", 0, ph, ph // 2, key="ed_y")
+                    _fsel = st.selectbox(
+                        "Fuente", ["Helvetica", "Times", "Courier"],
+                        index=["Helvetica","Times","Courier"].index(st.session_state.ed_font_name),
+                        key="ed_fsel_t"
+                    )
+                    _fsz  = st.number_input("Tamaño pt", 6, 120, st.session_state.ed_font_sz, key="ed_fsz_t")
+                    _tcol = st.color_picker("Color texto", st.session_state.ed_txt_color, key="ed_tcol_t")
+                    st.session_state.ed_font_name = _fsel
+                    st.session_state.ed_font_sz   = _fsz
+                    st.session_state.ed_txt_color = _tcol
 
+                    st.markdown(
+                        '<div style="font-size:11px;font-weight:700;color:#4A7A9C;'
+                        'margin:10px 0 6px 0;">Posición en el PDF</div>', unsafe_allow_html=True
+                    )
+                    _tx = st.number_input("X →", 0, int(pw_r), int(pw_r)//6, key="ed_tx_t")
+                    _ty = st.number_input("Y ↓", 0, int(ph_r), int(ph_r)//2, key="ed_ty_t")
+                    _tv = st.text_area("Texto", height=70, key="ed_tv_t",
+                                        placeholder="Escribe el texto…")
                     if st.button("➕ Agregar texto", type="primary",
-                                 use_container_width=True, key="ed_add_text",
-                                 disabled=not ed_txt.strip()):
-                        _fmap = {"Helvetica": "helv", "Times": "tiro", "Courier": "cour"}
-                        st.session_state.ed_elements.append({
-                            "type": "text", "page": cur_page,
-                            "text": ed_txt,
-                            "fontname": _fmap[ed_font_sel],
-                            "fontsize": ed_fsize,
-                            "color": ed_color,
-                            "x": ed_x, "y": ed_y,
+                                  use_container_width=True, key="ed_add_txt",
+                                  disabled=not _tv.strip()):
+                        _fmap_ed = {"Helvetica": "helv", "Times": "tiro", "Courier": "cour"}
+                        st.session_state.ed_text_elems.append({
+                            "page": cur_page, "x": _tx, "y": _ty,
+                            "text": _tv, "fontname": _fmap_ed[_fsel],
+                            "fontsize": _fsz, "color": _tcol,
                         })
                         st.rerun()
 
-                # ── Formulario rectángulo ──────────────────────────────────
+                elif _dm in ("rect", "circle", "freedraw", "line"):
+                    st.markdown(
+                        '<div style="font-size:11px;font-weight:700;color:#4A7A9C;'
+                        'margin-bottom:8px;">Apariencia</div>', unsafe_allow_html=True
+                    )
+                    st.session_state.ed_stroke_c = st.color_picker(
+                        "Color borde", st.session_state.ed_stroke_c, key="ed_sc_t"
+                    )
+                    st.session_state.ed_stroke_w = st.number_input(
+                        "Grosor", 1, 20, st.session_state.ed_stroke_w, key="ed_sw_t"
+                    )
+                    st.session_state.ed_has_fill = st.checkbox(
+                        "Con relleno", value=st.session_state.ed_has_fill, key="ed_hf_t"
+                    )
+                    if st.session_state.ed_has_fill:
+                        st.session_state.ed_fill_hex = st.color_picker(
+                            "Color relleno", st.session_state.ed_fill_hex, key="ed_fc_t"
+                        )
                 else:
                     st.markdown(
-                        '<div style="font-size:12px;font-weight:700;color:#4A7A9C;margin-bottom:10px;">'
-                        'Configurar rectángulo</div>', unsafe_allow_html=True
-                    )
-                    _rc1, _rc2 = st.columns(2)
-                    with _rc1:
-                        ed_x0     = st.number_input("X0 (izq)", 0, pw, pw // 4, key="ed_x0")
-                        ed_y0     = st.number_input("Y0 (top)", 0, ph, ph // 4, key="ed_y0")
-                        ed_stroke = st.color_picker("Color borde", "#FF0000", key="ed_stroke")
-                    with _rc2:
-                        ed_x1    = st.number_input("X1 (der)", 0, pw, 3*pw//4, key="ed_x1")
-                        ed_y1    = st.number_input("Y1 (bot)", 0, ph, 3*ph//4, key="ed_y1")
-                        ed_lw    = st.number_input("Grosor", 1, 10, 2, key="ed_lw")
-                    ed_has_fill = st.checkbox("Con relleno", value=False, key="ed_has_fill")
-                    ed_fill = st.color_picker("Color relleno", "#FFFF00", key="ed_fill") if ed_has_fill else ""
-
-                    if st.button("➕ Agregar rectángulo", type="primary",
-                                 use_container_width=True, key="ed_add_rect"):
-                        st.session_state.ed_elements.append({
-                            "type": "rect", "page": cur_page,
-                            "x0": ed_x0, "y0": ed_y0, "x1": ed_x1, "y1": ed_y1,
-                            "stroke": ed_stroke, "fill": ed_fill, "width": ed_lw,
-                        })
-                        st.rerun()
-
-                # ── Vista previa con todos los elementos ───────────────────
-                st.markdown(
-                    f'<div class="nx-section">🖼️ Vista previa — Página {cur_page + 1}</div>',
-                    unsafe_allow_html=True
-                )
-                try:
-                    _doc_prev = fitz.open(stream=ed_bytes, filetype="pdf")
-                    _pg_prev  = _doc_prev[cur_page]
-                    for _el in st.session_state.ed_elements:
-                        if _el["page"] != cur_page:
-                            continue
-                        if _el["type"] == "text":
-                            _cr = int(_el["color"][1:3],16)/255
-                            _cg = int(_el["color"][3:5],16)/255
-                            _cb = int(_el["color"][5:7],16)/255
-                            _pg_prev.insert_text(
-                                fitz.Point(_el["x"], _el["y"]),
-                                _el["text"], fontname=_el["fontname"],
-                                fontsize=_el["fontsize"], color=(_cr,_cg,_cb)
-                            )
-                        elif _el["type"] == "rect":
-                            _sr = int(_el["stroke"][1:3],16)/255
-                            _sg = int(_el["stroke"][3:5],16)/255
-                            _sb = int(_el["stroke"][5:7],16)/255
-                            _fill_r = None
-                            if _el["fill"]:
-                                _fill_r = (int(_el["fill"][1:3],16)/255,
-                                           int(_el["fill"][3:5],16)/255,
-                                           int(_el["fill"][5:7],16)/255)
-                            _pg_prev.draw_rect(
-                                fitz.Rect(_el["x0"],_el["y0"],_el["x1"],_el["y1"]),
-                                color=(_sr,_sg,_sb), fill=_fill_r, width=_el["width"]
-                            )
-                    _pix = _pg_prev.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
-                    st.image(_pix.tobytes("png"), use_container_width=True)
-                    _doc_prev.close()
-                except Exception as e:
-                    st.error(f"Error al renderizar: {e}")
-
-            # ── Columna derecha: lista de elementos + guardar ─────────────
-            with elem_col:
-                n_total   = len(st.session_state.ed_elements)
-                n_on_page = sum(1 for e in st.session_state.ed_elements if e["page"] == cur_page)
-
-                st.markdown(
-                    f'<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
-                    f'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">'
-                    f'Elementos ({n_total})</div>'
-                    f'<div style="font-size:12px;color:#2A4A6A;margin-bottom:12px;">'
-                    f'En página {cur_page+1}: {n_on_page}</div>',
-                    unsafe_allow_html=True
-                )
-
-                if n_total == 0:
-                    st.markdown(
-                        '<div style="font-size:12px;color:#1A3050;text-align:center;'
-                        'padding:20px 0;">Sin elementos aún</div>',
+                        '<div style="font-size:12px;color:#2A4A6A;padding:8px 0;">'
+                        'Selecciona elementos en el canvas para moverlos y redimensionarlos.</div>',
                         unsafe_allow_html=True
                     )
-                else:
-                    for _idx, _el in enumerate(st.session_state.ed_elements):
-                        _icon_el = "T" if _el["type"] == "text" else "□"
-                        _pg_n    = _el["page"] + 1
-                        if _el["type"] == "text":
-                            _lbl_el  = f'{_el["text"][:12]}{"…" if len(_el["text"])>12 else ""}'
-                            _det_el  = f'Pág.{_pg_n} · {_el["fontsize"]}pt'
-                        else:
-                            _lbl_el  = f'Rect ({_el["x0"]},{_el["y0"]})'
-                            _det_el  = f'Pág.{_pg_n}'
-                        _bg_el = "rgba(27,159,216,0.07)" if _el["page"] == cur_page else "rgba(27,159,216,0.02)"
-                        st.markdown(
-                            f'<div style="background:{_bg_el};border:1px solid rgba(27,159,216,0.12);'
-                            f'border-radius:8px;padding:8px 10px;margin-bottom:6px;">'
-                            f'<span style="background:rgba(27,159,216,0.2);color:#1B9FD8;'
-                            f'padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;">'
-                            f'{_icon_el}</span> '
-                            f'<span style="font-size:12px;color:#C8E4F0;font-weight:600;">{_lbl_el}</span>'
-                            f'<div style="font-size:10px;color:#2A4A6A;margin-top:2px;">{_det_el}</div>'
-                            f'</div>',
-                            unsafe_allow_html=True
-                        )
-                        if st.button("✕ Quitar", key=f"ed_del_{_idx}", use_container_width=True):
-                            st.session_state.ed_elements.pop(_idx)
-                            st.rerun()
 
                 st.markdown("---")
 
+                # ── Lista de textos ──────────────────────────────────────
+                _n_texts = len(st.session_state.ed_text_elems)
+                if _n_texts > 0:
+                    st.markdown(
+                        f'<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
+                        f'margin-bottom:8px;">Textos ({_n_texts})</div>', unsafe_allow_html=True
+                    )
+                    for _ti, _te in enumerate(st.session_state.ed_text_elems):
+                        _te_lbl = f'{_te["text"][:10]}{"…" if len(_te["text"])>10 else ""}'
+                        _te_pg  = _te["page"] + 1
+                        _te_bg  = "rgba(27,159,216,0.08)" if _te["page"] == cur_page else "rgba(27,159,216,0.02)"
+                        st.markdown(
+                            f'<div style="background:{_te_bg};border:1px solid rgba(27,159,216,0.12);'
+                            f'border-radius:6px;padding:7px 10px;margin-bottom:4px;">'
+                            f'<span style="background:rgba(27,159,216,0.2);color:#1B9FD8;'
+                            f'padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700;">T</span> '
+                            f'<span style="font-size:12px;color:#C8E4F0;font-weight:600;">{_te_lbl}</span>'
+                            f'<div style="font-size:10px;color:#2A4A6A;">'
+                            f'Pág.{_te_pg} · {_te["fontsize"]}pt</div></div>',
+                            unsafe_allow_html=True
+                        )
+                        if st.button("✕", key=f"ed_del_t_{_ti}", use_container_width=True):
+                            st.session_state.ed_text_elems.pop(_ti)
+                            st.rerun()
+                    st.markdown("---")
+
+                # ── Guardar cambios ──────────────────────────────────────
+                _has_shapes = any(
+                    len((st.session_state.get(f"ed_canvas_{_pi}") or {}).get("objects", [])) > 0
+                    for _pi in range(n_pages_ed)
+                )
+                _has_content = _has_shapes or _n_texts > 0
+
                 if st.button("💾 Guardar cambios", type="primary",
-                             use_container_width=True, key="ed_save",
-                             disabled=n_total == 0):
+                              use_container_width=True, key="ed_save3",
+                              disabled=not _has_content):
                     with st.spinner("Generando PDF…"):
                         try:
-                            _doc_save = fitz.open(stream=ed_bytes, filetype="pdf")
-                            for _el in st.session_state.ed_elements:
-                                _pg_s = _doc_save[_el["page"]]
-                                if _el["type"] == "text":
-                                    _cr3 = int(_el["color"][1:3],16)/255
-                                    _cg3 = int(_el["color"][3:5],16)/255
-                                    _cb3 = int(_el["color"][5:7],16)/255
-                                    _pg_s.insert_text(
-                                        fitz.Point(_el["x"], _el["y"]),
-                                        _el["text"], fontname=_el["fontname"],
-                                        fontsize=_el["fontsize"], color=(_cr3,_cg3,_cb3)
-                                    )
-                                elif _el["type"] == "rect":
-                                    _sr3 = int(_el["stroke"][1:3],16)/255
-                                    _sg3 = int(_el["stroke"][3:5],16)/255
-                                    _sb3 = int(_el["stroke"][5:7],16)/255
-                                    _fill3 = None
-                                    if _el["fill"]:
-                                        _fill3 = (int(_el["fill"][1:3],16)/255,
-                                                  int(_el["fill"][3:5],16)/255,
-                                                  int(_el["fill"][5:7],16)/255)
-                                    _pg_s.draw_rect(
-                                        fitz.Rect(_el["x0"],_el["y0"],_el["x1"],_el["y1"]),
-                                        color=(_sr3,_sg3,_sb3), fill=_fill3, width=_el["width"]
-                                    )
-                            _buf_save = BytesIO()
-                            _doc_save.save(_buf_save)
-                            _doc_save.close()
-                            _buf_save.seek(0)
-                            st.session_state.ed_result = _buf_save.getvalue()
+                            _doc_sv = fitz.open(stream=ed_bytes, filetype="pdf")
+
+                            # Aplicar formas del canvas por página
+                            for _pi in range(n_pages_ed):
+                                _cv_r = st.session_state.get(f"ed_canvas_{_pi}")
+                                if not isinstance(_cv_r, dict):
+                                    continue
+                                _objs = _cv_r.get("objects", [])
+                                if not _objs:
+                                    continue
+                                _pg_sv   = _doc_sv[_pi]
+                                _pw_sv   = _pg_sv.rect.width
+                                _ph_sv   = _pg_sv.rect.height
+                                _ch_sv   = int(_ph_sv * CANVAS_W / _pw_sv)
+                                _sxp     = _pw_sv / CANVAS_W
+                                _syp     = _ph_sv / _ch_sv
+
+                                for _obj in _objs:
+                                    _otype = _obj.get("type", "")
+                                    _left  = _obj.get("left", 0) * _sxp
+                                    _top   = _obj.get("top",  0) * _syp
+                                    _sc_x  = _obj.get("scaleX", 1.0)
+                                    _sc_y  = _obj.get("scaleY", 1.0)
+                                    _s_clr = _parse_fabric_color(_obj.get("stroke", "#000000"))
+                                    _f_clr = _parse_fabric_color(_obj.get("fill", ""))
+                                    _lw    = max(0.5, _obj.get("strokeWidth", 2) * _sxp)
+
+                                    if _otype == "rect":
+                                        _w2 = _obj.get("width", 0) * _sc_x * _sxp
+                                        _h2 = _obj.get("height", 0) * _sc_y * _syp
+                                        _pg_sv.draw_rect(
+                                            fitz.Rect(_left, _top, _left+_w2, _top+_h2),
+                                            color=_s_clr, fill=_f_clr, width=_lw
+                                        )
+                                    elif _otype == "circle":
+                                        _r  = _obj.get("radius", 0)
+                                        _w2 = _r * 2 * _sc_x * _sxp
+                                        _h2 = _r * 2 * _sc_y * _syp
+                                        _pg_sv.draw_oval(
+                                            fitz.Rect(_left, _top, _left+_w2, _top+_h2),
+                                            color=_s_clr, fill=_f_clr, width=_lw
+                                        )
+                                    elif _otype == "line":
+                                        _bw = _obj.get("width", 0)
+                                        _bh = _obj.get("height", 0)
+                                        _cx = _left + _bw * _sxp / 2
+                                        _cy = _top  + _bh * _syp / 2
+                                        _p1 = fitz.Point(
+                                            _cx + _obj.get("x1", 0) * _sxp,
+                                            _cy + _obj.get("y1", 0) * _syp
+                                        )
+                                        _p2 = fitz.Point(
+                                            _cx + _obj.get("x2", 0) * _sxp,
+                                            _cy + _obj.get("y2", 0) * _syp
+                                        )
+                                        _pg_sv.draw_line(_p1, _p2, color=_s_clr, width=_lw)
+                                    elif _otype == "path":
+                                        _pts = _extract_path_pts(_obj, _sxp, _syp)
+                                        if len(_pts) >= 2:
+                                            _pg_sv.draw_polyline(_pts, color=_s_clr, width=_lw)
+
+                            # Aplicar textos
+                            for _te in st.session_state.ed_text_elems:
+                                _pg_sv2 = _doc_sv[_te["page"]]
+                                _tc = _te["color"]
+                                _pg_sv2.insert_text(
+                                    fitz.Point(_te["x"], _te["y"]),
+                                    _te["text"], fontname=_te["fontname"],
+                                    fontsize=_te["fontsize"],
+                                    color=(int(_tc[1:3],16)/255,
+                                           int(_tc[3:5],16)/255,
+                                           int(_tc[5:7],16)/255)
+                                )
+
+                            _buf_sv = BytesIO()
+                            _doc_sv.save(_buf_sv)
+                            _doc_sv.close()
+                            _buf_sv.seek(0)
+                            st.session_state.ed_result = _buf_sv.getvalue()
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
 
                 if st.session_state.ed_result:
-                    ed_name = ed_file.name.replace(".pdf", "_editado.pdf")
                     st.download_button(
                         label="⬇️ Descargar PDF editado",
                         data=st.session_state.ed_result,
-                        file_name=ed_name,
+                        file_name=ed_file.name.replace(".pdf", "_editado.pdf"),
                         mime="application/pdf",
                         type="primary",
                         use_container_width=True
                     )
-                    if st.button("🔄 Nueva edición", use_container_width=True, key="ed_reset"):
-                        st.session_state.ed_elements = []
-                        st.session_state.ed_result   = None
-                        st.session_state.ed_cur_page = 0
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🔄 Nueva edición", use_container_width=True, key="ed_rst3"):
+                        st.session_state.ed_text_elems = []
+                        st.session_state.ed_result     = None
+                        st.session_state.ed_cur_page   = 0
+                        for _pi in range(n_pages_ed):
+                            _ck = f"ed_canvas_{_pi}"
+                            if _ck in st.session_state:
+                                del st.session_state[_ck]
                         st.rerun()
+
+            # ── Canvas principal (columna central) ─────────────────────────
+            with canvas_col:
+                _dm2 = st.session_state.ed_draw_mode
+                # En modo texto, el canvas está en "transform" (sólo mover existentes)
+                _canvas_mode = "transform" if _dm2 == "text" else _dm2
+
+                # Calcular fill RGBA para el canvas
+                if _dm2 in ("rect", "circle") and st.session_state.ed_has_fill:
+                    _fh = st.session_state.ed_fill_hex
+                    _fr_v, _fg_v, _fb_v = int(_fh[1:3],16), int(_fh[3:5],16), int(_fh[5:7],16)
+                    _fill_str = f"rgba({_fr_v},{_fg_v},{_fb_v},0.3)"
+                else:
+                    _fill_str = "rgba(0,0,0,0)"
+
+                _stroke_str = (st.session_state.ed_stroke_c
+                               if _dm2 not in ("text", "transform") else "#1B9FD8")
+                _sw_val     = (st.session_state.ed_stroke_w
+                               if _dm2 not in ("text", "transform") else 1)
+
+                _canvas_res = _st_canvas(
+                    fill_color=_fill_str,
+                    stroke_width=_sw_val,
+                    stroke_color=_stroke_str,
+                    background_image=_bg_pil,
+                    update_streamlit=True,
+                    height=canvas_h,
+                    width=CANVAS_W,
+                    drawing_mode=_canvas_mode,
+                    point_display_radius=0,
+                    display_toolbar=False,
+                    key=f"ed_canvas_{cur_page}",
+                )
+
+                # Guardar estado del canvas en session_state (para acceso entre páginas)
+                if _canvas_res is not None and _canvas_res.json_data is not None:
+                    st.session_state[f"ed_canvas_{cur_page}"] = _canvas_res.json_data
+
+                # Tip contextual
+                _ed_tips = {
+                    "rect":      "💡 Clic y arrastra para dibujar un rectángulo",
+                    "circle":    "💡 Clic y arrastra para dibujar una elipse",
+                    "freedraw":  "💡 Dibuja trazos libres directamente sobre el PDF",
+                    "line":      "💡 Clic y arrastra para trazar una línea",
+                    "transform": "💡 Clic para seleccionar · arrastra para mover · handles para redimensionar",
+                    "text":      "💡 Configura el texto en el panel derecho y pulsa ➕ Agregar texto",
+                }
+                st.caption(_ed_tips.get(_dm2, ""))
 
 
 # ==========================================
