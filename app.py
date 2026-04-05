@@ -5,6 +5,7 @@ import os
 import tempfile
 import base64
 import hashlib
+import json as _json
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from io import BytesIO
 
@@ -482,6 +483,331 @@ def _extract_path_pts(obj, sx, sy):
         elif t == "C" and len(cmd) >= 7:
             pts.append(fitz.Point((off_x + cmd[5]) * sx, (off_y + cmd[6]) * sy))
     return pts
+
+
+# ==========================================
+# HTML5 CANVAS TEMPLATE — Tab 5
+# ==========================================
+_CANVAS_TMPL = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0A1626; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; user-select: none; }
+#toolbar {
+  display: flex; align-items: center; gap: 5px; padding: 5px 8px;
+  background: #0E1E30; border-bottom: 1px solid #1B4060; flex-wrap: wrap;
+}
+.tb-btn {
+  background: #0A1626; border: 1px solid #1B4060; color: #C8E4F0;
+  border-radius: 5px; padding: 3px 9px; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.tb-btn:hover { background: #142638; }
+.tb-btn.active { background: #1B9FD8; border-color: #1B9FD8; color: #fff; }
+.tb-sep { width: 1px; background: #1B4060; height: 20px; flex-shrink: 0; margin: 0 2px; }
+.tb-lbl { font-size: 10px; color: #4A7A9C; white-space: nowrap; }
+.tb-color { width: 24px; height: 22px; border: 1px solid #1B4060; border-radius: 3px; cursor: pointer; padding: 1px; background: transparent; }
+.tb-num { width: 42px; background: #0A1626; color: #C8E4F0; border: 1px solid #1B4060; border-radius: 4px; font-size: 11px; padding: 2px 3px; }
+.tb-sel { background: #0A1626; color: #C8E4F0; border: 1px solid #1B4060; border-radius: 4px; font-size: 11px; padding: 2px 3px; }
+#save-btn {
+  background: #1B9FD8; border: none; color: #fff; border-radius: 5px;
+  padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; margin-left: auto; white-space: nowrap;
+}
+#save-btn:hover { background: #1489BD; }
+#del-btn {
+  background: #C0392B; border: none; color: #fff; border-radius: 5px;
+  padding: 3px 9px; font-size: 12px; cursor: pointer; display: none; white-space: nowrap;
+}
+#canvas-wrap { position: relative; overflow: hidden; }
+#myCanvas { display: block; cursor: crosshair; }
+#status { font-size: 10px; color: #2A4A6A; padding: 2px 8px; min-height: 16px; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button class="tb-btn active" id="btn-tf"   onclick="setTool('tf')">&#10021; Mover</button>
+  <button class="tb-btn"        id="btn-rect" onclick="setTool('rect')">&#9633; Rect</button>
+  <button class="tb-btn"        id="btn-ell"  onclick="setTool('ell')">&#9711; Elipse</button>
+  <button class="tb-btn"        id="btn-line" onclick="setTool('line')">&#8599; L&iacute;nea</button>
+  <button class="tb-btn"        id="btn-text" onclick="setTool('text')">T Texto</button>
+  <button id="del-btn" onclick="delSel()">&#10005; Borrar</button>
+  <div class="tb-sep"></div>
+  <span class="tb-lbl">Borde:</span>
+  <input type="color" class="tb-color" id="sc" value="#E74C3C">
+  <input type="number" class="tb-num" id="sw" min="1" max="20" value="2">
+  <span class="tb-lbl">Relleno:</span>
+  <input type="color" class="tb-color" id="fc" value="#FFCC00">
+  <input type="checkbox" id="useFill" style="accent-color:#1B9FD8;cursor:pointer;" title="Activar relleno">
+  <div class="tb-sep"></div>
+  <span class="tb-lbl">Texto:</span>
+  <input type="color" class="tb-color" id="tc" value="#000000">
+  <select class="tb-sel" id="ff"><option>Helvetica</option><option>Times</option><option>Courier</option></select>
+  <input type="number" class="tb-num" id="fs" min="6" max="120" value="14">
+  <button id="save-btn" onclick="saveDat()">&#128190; Guardar p&aacute;gina</button>
+</div>
+<div id="canvas-wrap">
+  <canvas id="myCanvas" width="___CW___" height="___CH___"></canvas>
+</div>
+<div id="status">Herramienta activa: Mover/Seleccionar</div>
+<script>
+var CW = ___CW___;
+var CH = ___CH___;
+var HR = 5;
+var cvs = document.getElementById('myCanvas');
+var ctx = cvs.getContext('2d');
+var els = ___INIT___;
+var tool = 'tf';
+var selIdx = -1;
+var drag = null;
+var drawing = null;
+
+var bgImg = new Image();
+bgImg.onload = draw;
+bgImg.src = 'data:image/png;base64,___BG___';
+
+function setTool(t) {
+  tool = t;
+  var btns = document.querySelectorAll('.tb-btn');
+  for (var i=0;i<btns.length;i++) btns[i].classList.remove('active');
+  var btn = document.getElementById('btn-' + t);
+  if (btn) btn.classList.add('active');
+  selIdx = -1;
+  document.getElementById('del-btn').style.display = 'none';
+  var tips = {tf:'Clic para seleccionar, arrastra para mover, handles para redimensionar',rect:'Clic y arrastra para dibujar un rectangulo',ell:'Clic y arrastra para dibujar una elipse',line:'Clic y arrastra para trazar una linea',text:'Clic en el canvas para escribir texto'};
+  document.getElementById('status').textContent = tips[t] || t;
+  draw();
+}
+
+function getSC() { return document.getElementById('sc').value; }
+function getSW() { return parseFloat(document.getElementById('sw').value) || 2; }
+function getFC() {
+  if (!document.getElementById('useFill').checked) return '';
+  var h = document.getElementById('fc').value;
+  var r=parseInt(h.slice(1,3),16), g=parseInt(h.slice(3,5),16), b=parseInt(h.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+',0.35)';
+}
+function getTC() { return document.getElementById('tc').value; }
+function getFF() { return document.getElementById('ff').value; }
+function getFS() { return parseInt(document.getElementById('fs').value) || 14; }
+
+function getHandles(e) {
+  if (e.type === 'line') return [{id:'p1',x:e.x1,y:e.y1},{id:'p2',x:e.x2,y:e.y2}];
+  return [
+    {id:'tl',x:e.x,      y:e.y},        {id:'tm',x:e.x+e.w/2,y:e.y},        {id:'tr',x:e.x+e.w,y:e.y},
+    {id:'ml',x:e.x,      y:e.y+e.h/2},                                       {id:'mr',x:e.x+e.w,y:e.y+e.h/2},
+    {id:'bl',x:e.x,      y:e.y+e.h},    {id:'bm',x:e.x+e.w/2,y:e.y+e.h},   {id:'br',x:e.x+e.w,y:e.y+e.h}
+  ];
+}
+
+function hitHandle(e, mx, my) {
+  var hs = getHandles(e);
+  for (var i=0;i<hs.length;i++) {
+    if (Math.sqrt((mx-hs[i].x)*(mx-hs[i].x)+(my-hs[i].y)*(my-hs[i].y)) <= HR+2) return hs[i].id;
+  }
+  return null;
+}
+
+function hitElement(e, mx, my) {
+  if (e.type === 'rect') return mx>=e.x && mx<=e.x+e.w && my>=e.y && my<=e.y+e.h;
+  if (e.type === 'ell') {
+    var cx=e.x+e.w/2, cy=e.y+e.h/2, rx=Math.abs(e.w/2)+5, ry=Math.abs(e.h/2)+5;
+    return (mx-cx)*(mx-cx)/(rx*rx)+(my-cy)*(my-cy)/(ry*ry) <= 1;
+  }
+  if (e.type === 'line') {
+    var dx=e.x2-e.x1, dy=e.y2-e.y1, len=Math.sqrt(dx*dx+dy*dy);
+    if (len<1) return Math.sqrt((mx-e.x1)*(mx-e.x1)+(my-e.y1)*(my-e.y1)) < 8;
+    var t=Math.max(0,Math.min(1,((mx-e.x1)*dx+(my-e.y1)*dy)/(len*len)));
+    return Math.sqrt((mx-(e.x1+t*dx))*(mx-(e.x1+t*dx))+(my-(e.y1+t*dy))*(my-(e.y1+t*dy))) < 7;
+  }
+  if (e.type === 'text') {
+    var tw=e.txt.length*e.fs*0.55, th=e.fs*1.4;
+    return mx>=e.x && mx<=e.x+tw && my>=e.y-th && my<=e.y+e.fs*0.3;
+  }
+  return false;
+}
+
+function drawEl(e, isSel, isDraft) {
+  ctx.save();
+  ctx.strokeStyle = e.sc || '#E74C3C';
+  ctx.lineWidth   = e.sw || 2;
+  if (isDraft) ctx.setLineDash([4,3]);
+  if (e.type === 'rect') {
+    if (e.fc) { ctx.fillStyle=e.fc; ctx.fillRect(e.x,e.y,e.w,e.h); }
+    ctx.strokeRect(e.x,e.y,e.w,e.h);
+  } else if (e.type === 'ell') {
+    ctx.beginPath();
+    ctx.ellipse(e.x+e.w/2, e.y+e.h/2, Math.max(1,Math.abs(e.w/2)), Math.max(1,Math.abs(e.h/2)), 0, 0, Math.PI*2);
+    if (e.fc) { ctx.fillStyle=e.fc; ctx.fill(); }
+    ctx.stroke();
+  } else if (e.type === 'line') {
+    ctx.beginPath(); ctx.moveTo(e.x1,e.y1); ctx.lineTo(e.x2,e.y2); ctx.stroke();
+  } else if (e.type === 'text') {
+    ctx.font = e.fs+'px '+e.ff;
+    ctx.fillStyle = e.tc || '#000';
+    ctx.fillText(e.txt, e.x, e.y);
+  }
+  ctx.restore();
+  if (isSel) {
+    ctx.save();
+    ctx.strokeStyle = '#1B9FD8';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4,3]);
+    if (e.type === 'line') {
+      ctx.beginPath(); ctx.moveTo(e.x1,e.y1); ctx.lineTo(e.x2,e.y2); ctx.stroke();
+    } else {
+      ctx.strokeRect(e.x-2,e.y-2,e.w+4,e.h+4);
+    }
+    ctx.setLineDash([]);
+    var hs = getHandles(e);
+    for (var i=0;i<hs.length;i++) {
+      ctx.beginPath(); ctx.arc(hs[i].x,hs[i].y,HR,0,Math.PI*2);
+      ctx.fillStyle='#1B9FD8'; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function draw() {
+  ctx.clearRect(0,0,CW,CH);
+  if (bgImg.complete && bgImg.naturalWidth>0) ctx.drawImage(bgImg,0,0,CW,CH);
+  else { ctx.fillStyle='#f8f8f8'; ctx.fillRect(0,0,CW,CH); }
+  for (var i=0;i<els.length;i++) drawEl(els[i], i===selIdx, false);
+  if (drawing) drawEl(drawing, false, true);
+}
+
+function getXY(e) {
+  var r = cvs.getBoundingClientRect();
+  return {x: e.clientX-r.left, y: e.clientY-r.top};
+}
+
+cvs.addEventListener('mousedown', function(e) {
+  var p = getXY(e);
+  if (tool === 'tf') {
+    if (selIdx >= 0) {
+      var hid = hitHandle(els[selIdx], p.x, p.y);
+      if (hid) { drag={type:'resize',idx:selIdx,hid:hid,ox:p.x,oy:p.y,snap:JSON.parse(JSON.stringify(els[selIdx]))}; return; }
+    }
+    for (var i=els.length-1;i>=0;i--) {
+      if (hitElement(els[i],p.x,p.y)) {
+        selIdx=i; drag={type:'move',idx:i,ox:p.x,oy:p.y,snap:JSON.parse(JSON.stringify(els[i]))};
+        document.getElementById('del-btn').style.display=''; draw(); return;
+      }
+    }
+    selIdx=-1; document.getElementById('del-btn').style.display='none'; draw(); return;
+  }
+  if (tool === 'text') { addTextAt(p.x, p.y); return; }
+  if (tool === 'rect') drawing={type:'rect',x:p.x,y:p.y,w:0,h:0,sc:getSC(),sw:getSW(),fc:getFC()};
+  if (tool === 'ell')  drawing={type:'ell', x:p.x,y:p.y,w:0,h:0,sc:getSC(),sw:getSW(),fc:getFC()};
+  if (tool === 'line') drawing={type:'line',x1:p.x,y1:p.y,x2:p.x,y2:p.y,sc:getSC(),sw:getSW()};
+});
+
+cvs.addEventListener('mousemove', function(e) {
+  var p = getXY(e);
+  if (drag) {
+    var el=els[drag.idx], s=drag.snap, dx=p.x-drag.ox, dy=p.y-drag.oy, h=drag.hid;
+    if (drag.type === 'move') {
+      if (el.type==='line') { el.x1=s.x1+dx; el.y1=s.y1+dy; el.x2=s.x2+dx; el.y2=s.y2+dy; }
+      else { el.x=s.x+dx; el.y=s.y+dy; }
+    } else {
+      if (el.type==='line') {
+        if (h==='p1') { el.x1=s.x1+dx; el.y1=s.y1+dy; } else { el.x2=s.x2+dx; el.y2=s.y2+dy; }
+      } else {
+        var nx=s.x, ny=s.y, nw=s.w, nh=s.h;
+        if (h==='tl'||h==='ml'||h==='bl') { nx=s.x+dx; nw=s.w-dx; }
+        if (h==='tr'||h==='mr'||h==='br') { nw=s.w+dx; }
+        if (h==='tl'||h==='tm'||h==='tr') { ny=s.y+dy; nh=s.h-dy; }
+        if (h==='bl'||h==='bm'||h==='br') { nh=s.h+dy; }
+        if (nw>4) { el.x=nx; el.w=nw; } if (nh>4) { el.y=ny; el.h=nh; }
+      }
+    }
+    draw(); return;
+  }
+  if (drawing) {
+    if (drawing.type==='rect'||drawing.type==='ell') { drawing.w=p.x-drawing.x; drawing.h=p.y-drawing.y; }
+    if (drawing.type==='line') { drawing.x2=p.x; drawing.y2=p.y; }
+    draw();
+  }
+});
+
+cvs.addEventListener('mouseup', function(e) {
+  if (drag) { drag=null; return; }
+  if (drawing) {
+    var d=drawing; drawing=null; var MIN=4;
+    if ((d.type==='rect'||d.type==='ell') && (Math.abs(d.w)>MIN||Math.abs(d.h)>MIN)) {
+      var rx=Math.min(d.x,d.x+d.w), ry=Math.min(d.y,d.y+d.h);
+      els.push({type:d.type,x:rx,y:ry,w:Math.abs(d.w),h:Math.abs(d.h),sc:d.sc,sw:d.sw,fc:d.fc});
+    }
+    if (d.type==='line' && Math.sqrt((d.x2-d.x1)*(d.x2-d.x1)+(d.y2-d.y1)*(d.y2-d.y1))>MIN) {
+      els.push({type:'line',x1:d.x1,y1:d.y1,x2:d.x2,y2:d.y2,sc:d.sc,sw:d.sw});
+    }
+    draw();
+  }
+});
+
+function addTextAt(cx, cy) {
+  var wrap = document.getElementById('canvas-wrap');
+  var inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = 'Escribe y presiona Enter';
+  var fs = getFS();
+  inp.style.cssText = 'position:absolute;left:'+cx+'px;top:'+(cy-fs)+'px;font-size:'+fs+'px;font-family:'+getFF()+';color:'+getTC()+';background:rgba(255,255,255,0.92);border:1px dashed #1B9FD8;border-radius:3px;padding:2px 5px;min-width:100px;max-width:'+(CW-cx-4)+'px;outline:none;z-index:20;';
+  wrap.appendChild(inp);
+  inp.focus();
+  var done = false;
+  var finish = function() {
+    if (done) return; done=true;
+    var v = inp.value.trim();
+    if (v) { els.push({type:'text',x:cx,y:cy,txt:v,ff:getFF(),fs:fs,tc:getTC()}); draw(); }
+    if (inp.parentNode) inp.parentNode.removeChild(inp);
+  };
+  inp.addEventListener('keydown', function(ev) { if (ev.key==='Enter'||ev.key==='Escape') { ev.preventDefault(); finish(); } });
+  inp.addEventListener('blur', finish);
+}
+
+function delSel() {
+  if (selIdx>=0 && selIdx<els.length) {
+    els.splice(selIdx,1); selIdx=-1;
+    document.getElementById('del-btn').style.display='none'; draw();
+  }
+}
+
+function saveDat() {
+  var payload = JSON.stringify({canvas_width:CW, canvas_height:CH, elements:els});
+  try {
+    var pd = window.parent.document;
+    var ta = null;
+    var wrappers = pd.querySelectorAll('[data-testid="stTextArea"]');
+    for (var i=0;i<wrappers.length;i++) {
+      var lbl = wrappers[i].querySelector('label');
+      if (lbl && lbl.textContent.trim()==='NEXA_CANVAS_DATA') { ta=wrappers[i].querySelector('textarea'); break; }
+    }
+    if (!ta) ta = pd.querySelector('textarea[aria-label="NEXA_CANVAS_DATA"]');
+    if (!ta) {
+      var allta = pd.querySelectorAll('textarea');
+      for (var j=0;j<allta.length;j++) {
+        var id=allta[j].id;
+        if (id) { var lb=pd.querySelector('label[for="'+id+'"]'); if (lb && lb.textContent.includes('NEXA_CANVAS_DATA')) { ta=allta[j]; break; } }
+      }
+    }
+    if (ta) {
+      var setter = Object.getOwnPropertyDescriptor(window.parent.HTMLTextAreaElement.prototype,'value').set;
+      setter.call(ta, payload);
+      ta.dispatchEvent(new window.parent.Event('input',{bubbles:true}));
+      ta.dispatchEvent(new window.parent.Event('change',{bubbles:true}));
+      setTimeout(function(){ta.dispatchEvent(new window.parent.Event('blur',{bubbles:true}));},120);
+      document.getElementById('status').textContent = '\u2713 '+els.length+' elemento(s) guardado(s) — Streamlit actualizando...';
+    } else {
+      document.getElementById('status').textContent = '\u26a0 Campo receptor no encontrado. Recarga la pagina.';
+    }
+  } catch(err) {
+    document.getElementById('status').textContent = 'Error: '+err.message;
+  }
+}
+</script>
+</body>
+</html>"""
 
 
 # ==========================================
@@ -1285,69 +1611,45 @@ with tabs[4]:
 
 
 # ==========================================
-# TAB 5 — EDITAR PDF (Canvas Visual)
+# TAB 5 — EDITAR PDF (Canvas HTML5)
 # ==========================================
 with tabs[5]:
 
-    # ── Importaciones opcionales ───────────────────────────────────────────
-    try:
-        from streamlit_drawable_canvas import st_canvas as _st_canvas
-        _CANVAS_PKG = True
-    except ImportError:
-        _CANVAS_PKG = False
-
-    try:
-        from PIL import Image as _PILImg
-        _PIL_PKG = True
-    except ImportError:
-        _PIL_PKG = False
-
     for _k, _v in [
-        ("ed_sig", ""), ("ed_thumbs", []), ("ed_n", 0),
-        ("ed_text_elems", []),
-        ("ed_cur_page", 0),
-        ("ed_draw_mode", "rect"),
-        ("ed_stroke_c", "#E74C3C"),
-        ("ed_fill_hex", "#FFCC00"),
-        ("ed_has_fill", False),
-        ("ed_stroke_w", 2),
-        ("ed_font_name", "Helvetica"),
-        ("ed_font_sz", 14),
-        ("ed_txt_color", "#000000"),
-        ("ed_result", None),
+        ("ed_sig",         ""),
+        ("ed_thumbs",      []),
+        ("ed_n",           0),
+        ("ed_cur_page",    0),
+        ("ed_canvas_data", {}),
+        ("ed_result",      None),
     ]:
         if _k not in st.session_state:
             st.session_state[_k] = _v
 
     st.markdown("""
     <div class="nx-page-header">
-        <div class="nx-page-title">✏️ Editar PDF</div>
-        <div class="nx-page-sub">Editor visual interactivo: dibuja <strong>rectángulos</strong>,
-        <strong>elipses</strong>, <strong>trazos libres</strong> y <strong>líneas</strong>
-        directamente sobre el PDF. Agrega texto en posición exacta y descarga el resultado.</div>
+        <div class="nx-page-title">&#9999;&#65039; Editar PDF</div>
+        <div class="nx-page-sub">Editor visual interactivo: dibuja <strong>rect&aacute;ngulos</strong>,
+        <strong>elipses</strong>, <strong>l&iacute;neas</strong> y <strong>texto</strong>
+        directamente sobre el PDF. Guarda p&aacute;gina a p&aacute;gina y descarga el resultado.</div>
     </div>
     """, unsafe_allow_html=True)
 
     ed_file = st.file_uploader("Sube el PDF a editar", type=["pdf"], key="ed_uploader")
 
     if not ed_file:
-        st.session_state.ed_result     = None
-        st.session_state.ed_text_elems = []
-        st.session_state.ed_cur_page   = 0
+        st.session_state.ed_canvas_data = {}
+        st.session_state.ed_result      = None
+        st.session_state.ed_cur_page    = 0
         st.markdown("""
         <div class="nx-empty">
-            <div class="nx-empty-icon">✏️</div>
+            <div class="nx-empty-icon">&#9999;&#65039;</div>
             <div class="nx-empty-text">Sube un PDF para empezar a editarlo</div>
-            <div class="nx-empty-sub">Dibuja sobre el PDF y agrega texto en posición exacta</div>
+            <div class="nx-empty-sub">Dibuja sobre el PDF directamente en el editor visual</div>
         </div>""", unsafe_allow_html=True)
     else:
         if not FITZ_OK:
-            st.error("⚠️ PyMuPDF no está instalado.")
-        elif not _CANVAS_PKG:
-            st.error("⚠️ `streamlit-drawable-canvas` no está instalado. "
-                     "Asegúrate de que está en requirements.txt y redespliega la app.")
-        elif not _PIL_PKG:
-            st.error("⚠️ `Pillow` no está instalado.")
+            st.error("PyMuPDF no esta instalado.")
         else:
             ed_bytes = ed_file.read()
             thumbs_ed, n_pages_ed = _ensure_thumbs("ed", ed_bytes)
@@ -1355,7 +1657,7 @@ with tabs[5]:
             cur_page = max(0, min(st.session_state.ed_cur_page, n_pages_ed - 1))
             st.session_state.ed_cur_page = cur_page
 
-            # ── Render página actual como imagen PIL para el canvas ─────────
+            # ── Render background image (base64 PNG) for HTML canvas ────────
             CANVAS_W = 680
             _doc_ed = fitz.open(stream=ed_bytes, filetype="pdf")
             _pg_ed  = _doc_ed[cur_page]
@@ -1366,24 +1668,34 @@ with tabs[5]:
                 matrix=fitz.Matrix(CANVAS_W / pw_r, canvas_h / ph_r), alpha=False
             )
             _doc_ed.close()
-            _bg_pil = _PILImg.frombytes("RGB", [_pix_bg.width, _pix_bg.height], _pix_bg.samples)
+            _bg_b64 = base64.b64encode(_pix_bg.tobytes("png")).decode()
 
-            # ── Layout 3 columnas ──────────────────────────────────────────
+            # ── Current page saved elements ──────────────────────────────────
+            _cur_els    = st.session_state.ed_canvas_data.get(cur_page, [])
+            _init_json  = _json.dumps(_cur_els)
+
+            # ── Build canvas HTML ────────────────────────────────────────────
+            _canvas_html = (
+                _CANVAS_TMPL
+                .replace("___BG___",   _bg_b64)
+                .replace("___CW___",   str(CANVAS_W))
+                .replace("___CH___",   str(canvas_h))
+                .replace("___INIT___", _init_json)
+            )
+
+            # ── Layout 3 columnas ────────────────────────────────────────────
             nav_col, canvas_col, props_col = st.columns([1, 3, 1.5])
 
             # ── Columna izquierda: miniaturas de páginas ───────────────────
             with nav_col:
                 st.markdown(
                     '<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
-                    'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Páginas</div>',
+                    'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">P&aacute;ginas</div>',
                     unsafe_allow_html=True
                 )
                 for pi in range(n_pages_ed):
                     _is_cur = pi == cur_page
-                    _n_txt  = sum(1 for e in st.session_state.ed_text_elems if e["page"] == pi)
-                    _cv_raw = st.session_state.get(f"ed_canvas_{pi}")
-                    _n_shp  = len(_cv_raw.get("objects", [])) if isinstance(_cv_raw, dict) else 0
-                    _n_el   = _n_txt + _n_shp
+                    _n_el   = len(st.session_state.ed_canvas_data.get(pi, []))
                     _bdr_pn = "2px solid #1B9FD8" if _is_cur else "1px solid rgba(27,159,216,0.15)"
                     _bg_pn  = "rgba(27,159,216,0.12)" if _is_cur else "#0A1626"
                     _bdg_pn = (f'<div style="position:absolute;bottom:4px;right:4px;background:#1B9FD8;'
@@ -1404,285 +1716,125 @@ with tabs[5]:
                             st.session_state.ed_cur_page = pi
                             st.rerun()
 
-            # ── Columna derecha: herramientas + propiedades + guardar ──────
+            # ── Columna derecha: acciones + receptor de datos ──────────────
             with props_col:
                 st.markdown(
-                    '<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
-                    'text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Herramienta</div>',
+                    f'<div style="font-size:12px;color:#4A7A9C;margin-bottom:6px;">'
+                    f'P&aacute;gina {cur_page+1} de {n_pages_ed}</div>',
                     unsafe_allow_html=True
                 )
-                _tools_ed = [
-                    ("rect",      "□  Rectángulo"),
-                    ("circle",    "○  Elipse"),
-                    ("freedraw",  "✏️  Trazo libre"),
-                    ("line",      "↗  Línea"),
-                    ("transform", "✥  Mover / Redim"),
-                    ("text",      "T   Texto"),
-                ]
-                for _tm, _tlbl in _tools_ed:
-                    _is_act_t = st.session_state.ed_draw_mode == _tm
-                    if st.button(
-                        _tlbl, key=f"ed_tool_{_tm}",
-                        use_container_width=True,
-                        type="primary" if _is_act_t else "secondary"
-                    ):
-                        st.session_state.ed_draw_mode = _tm
-                        st.rerun()
-
-                st.markdown("<br>", unsafe_allow_html=True)
-                _dm = st.session_state.ed_draw_mode
-
-                # ── Propiedades según herramienta ────────────────────────
-                if _dm == "text":
-                    st.markdown(
-                        '<div style="font-size:11px;font-weight:700;color:#4A7A9C;'
-                        'margin-bottom:8px;">Configurar texto</div>', unsafe_allow_html=True
-                    )
-                    _fsel = st.selectbox(
-                        "Fuente", ["Helvetica", "Times", "Courier"],
-                        index=["Helvetica","Times","Courier"].index(st.session_state.ed_font_name),
-                        key="ed_fsel_t"
-                    )
-                    _fsz  = st.number_input("Tamaño pt", 6, 120, st.session_state.ed_font_sz, key="ed_fsz_t")
-                    _tcol = st.color_picker("Color texto", st.session_state.ed_txt_color, key="ed_tcol_t")
-                    st.session_state.ed_font_name = _fsel
-                    st.session_state.ed_font_sz   = _fsz
-                    st.session_state.ed_txt_color = _tcol
-
-                    st.markdown(
-                        '<div style="font-size:11px;font-weight:700;color:#4A7A9C;'
-                        'margin:10px 0 6px 0;">Posición en el PDF</div>', unsafe_allow_html=True
-                    )
-                    _tx = st.number_input("X →", 0, int(pw_r), int(pw_r)//6, key="ed_tx_t")
-                    _ty = st.number_input("Y ↓", 0, int(ph_r), int(ph_r)//2, key="ed_ty_t")
-                    _tv = st.text_area("Texto", height=70, key="ed_tv_t",
-                                        placeholder="Escribe el texto…")
-                    if st.button("➕ Agregar texto", type="primary",
-                                  use_container_width=True, key="ed_add_txt",
-                                  disabled=not _tv.strip()):
-                        _fmap_ed = {"Helvetica": "helv", "Times": "tiro", "Courier": "cour"}
-                        st.session_state.ed_text_elems.append({
-                            "page": cur_page, "x": _tx, "y": _ty,
-                            "text": _tv, "fontname": _fmap_ed[_fsel],
-                            "fontsize": _fsz, "color": _tcol,
-                        })
-                        st.rerun()
-
-                elif _dm in ("rect", "circle", "freedraw", "line"):
-                    st.markdown(
-                        '<div style="font-size:11px;font-weight:700;color:#4A7A9C;'
-                        'margin-bottom:8px;">Apariencia</div>', unsafe_allow_html=True
-                    )
-                    st.session_state.ed_stroke_c = st.color_picker(
-                        "Color borde", st.session_state.ed_stroke_c, key="ed_sc_t"
-                    )
-                    st.session_state.ed_stroke_w = st.number_input(
-                        "Grosor", 1, 20, st.session_state.ed_stroke_w, key="ed_sw_t"
-                    )
-                    st.session_state.ed_has_fill = st.checkbox(
-                        "Con relleno", value=st.session_state.ed_has_fill, key="ed_hf_t"
-                    )
-                    if st.session_state.ed_has_fill:
-                        st.session_state.ed_fill_hex = st.color_picker(
-                            "Color relleno", st.session_state.ed_fill_hex, key="ed_fc_t"
-                        )
-                else:
-                    st.markdown(
-                        '<div style="font-size:12px;color:#2A4A6A;padding:8px 0;">'
-                        'Selecciona elementos en el canvas para moverlos y redimensionarlos.</div>',
-                        unsafe_allow_html=True
-                    )
-
-                st.markdown("---")
-
-                # ── Lista de textos ──────────────────────────────────────
-                _n_texts = len(st.session_state.ed_text_elems)
-                if _n_texts > 0:
-                    st.markdown(
-                        f'<div style="font-size:11px;font-weight:700;color:#1B9FD8;'
-                        f'margin-bottom:8px;">Textos ({_n_texts})</div>', unsafe_allow_html=True
-                    )
-                    for _ti, _te in enumerate(st.session_state.ed_text_elems):
-                        _te_lbl = f'{_te["text"][:10]}{"…" if len(_te["text"])>10 else ""}'
-                        _te_pg  = _te["page"] + 1
-                        _te_bg  = "rgba(27,159,216,0.08)" if _te["page"] == cur_page else "rgba(27,159,216,0.02)"
-                        st.markdown(
-                            f'<div style="background:{_te_bg};border:1px solid rgba(27,159,216,0.12);'
-                            f'border-radius:6px;padding:7px 10px;margin-bottom:4px;">'
-                            f'<span style="background:rgba(27,159,216,0.2);color:#1B9FD8;'
-                            f'padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700;">T</span> '
-                            f'<span style="font-size:12px;color:#C8E4F0;font-weight:600;">{_te_lbl}</span>'
-                            f'<div style="font-size:10px;color:#2A4A6A;">'
-                            f'Pág.{_te_pg} · {_te["fontsize"]}pt</div></div>',
-                            unsafe_allow_html=True
-                        )
-                        if st.button("✕", key=f"ed_del_t_{_ti}", use_container_width=True):
-                            st.session_state.ed_text_elems.pop(_ti)
-                            st.rerun()
-                    st.markdown("---")
-
-                # ── Guardar cambios ──────────────────────────────────────
-                _has_shapes = any(
-                    len((st.session_state.get(f"ed_canvas_{_pi}") or {}).get("objects", [])) > 0
-                    for _pi in range(n_pages_ed)
+                _total_els = sum(len(v) for v in st.session_state.ed_canvas_data.values())
+                st.markdown(
+                    f'<div style="font-size:11px;color:#2A4A6A;margin-bottom:10px;">'
+                    f'{_total_els} elemento(s) en total</div>',
+                    unsafe_allow_html=True
                 )
-                _has_content = _has_shapes or _n_texts > 0
+                st.markdown(
+                    '<div style="font-size:11px;color:#4A7A9C;margin-bottom:8px;">'
+                    'Usa <strong style="color:#1B9FD8">Guardar p&aacute;gina</strong> '
+                    'en la barra del canvas para confirmar cada p&aacute;gina, '
+                    'luego aplica al PDF:</div>',
+                    unsafe_allow_html=True
+                )
 
-                if st.button("💾 Guardar cambios", type="primary",
-                              use_container_width=True, key="ed_save3",
-                              disabled=not _has_content):
-                    with st.spinner("Generando PDF…"):
+                if st.button("&#128196; Aplicar al PDF", type="primary",
+                              use_container_width=True, key="ed_save_pdf",
+                              disabled=_total_els == 0):
+                    with st.spinner("Generando PDF..."):
                         try:
                             _doc_sv = fitz.open(stream=ed_bytes, filetype="pdf")
-
-                            # Aplicar formas del canvas por página
-                            for _pi in range(n_pages_ed):
-                                _cv_r = st.session_state.get(f"ed_canvas_{_pi}")
-                                if not isinstance(_cv_r, dict):
+                            for _pi, _page_els in st.session_state.ed_canvas_data.items():
+                                if not _page_els:
                                     continue
-                                _objs = _cv_r.get("objects", [])
-                                if not _objs:
-                                    continue
-                                _pg_sv   = _doc_sv[_pi]
-                                _pw_sv   = _pg_sv.rect.width
-                                _ph_sv   = _pg_sv.rect.height
-                                _ch_sv   = int(_ph_sv * CANVAS_W / _pw_sv)
-                                _sxp     = _pw_sv / CANVAS_W
-                                _syp     = _ph_sv / _ch_sv
-
-                                for _obj in _objs:
-                                    _otype = _obj.get("type", "")
-                                    _left  = _obj.get("left", 0) * _sxp
-                                    _top   = _obj.get("top",  0) * _syp
-                                    _sc_x  = _obj.get("scaleX", 1.0)
-                                    _sc_y  = _obj.get("scaleY", 1.0)
-                                    _s_clr = _parse_fabric_color(_obj.get("stroke", "#000000"))
-                                    _f_clr = _parse_fabric_color(_obj.get("fill", ""))
-                                    _lw    = max(0.5, _obj.get("strokeWidth", 2) * _sxp)
-
-                                    if _otype == "rect":
-                                        _w2 = _obj.get("width", 0) * _sc_x * _sxp
-                                        _h2 = _obj.get("height", 0) * _sc_y * _syp
+                                _pg_sv = _doc_sv[_pi]
+                                _pw_sv = _pg_sv.rect.width
+                                _ph_sv = _pg_sv.rect.height
+                                _ch_sv = int(_ph_sv * CANVAS_W / _pw_sv)
+                                _sxp   = _pw_sv / CANVAS_W
+                                _syp   = _ph_sv / _ch_sv
+                                for _el in _page_els:
+                                    _et  = _el.get("type", "")
+                                    _sc  = _parse_fabric_color(_el.get("sc", "#000000"))
+                                    _lw  = max(0.5, (_el.get("sw", 2)) * _sxp)
+                                    _fcs = _el.get("fc", "")
+                                    _fc  = _parse_fabric_color(_fcs) if _fcs else None
+                                    if _et == "rect":
+                                        _rx = _el["x"]*_sxp; _ry = _el["y"]*_syp
+                                        _rw = _el["w"]*_sxp; _rh = _el["h"]*_syp
                                         _pg_sv.draw_rect(
-                                            fitz.Rect(_left, _top, _left+_w2, _top+_h2),
-                                            color=_s_clr, fill=_f_clr, width=_lw
+                                            fitz.Rect(_rx,_ry,_rx+_rw,_ry+_rh),
+                                            color=_sc, fill=_fc, width=_lw
                                         )
-                                    elif _otype == "circle":
-                                        _r  = _obj.get("radius", 0)
-                                        _w2 = _r * 2 * _sc_x * _sxp
-                                        _h2 = _r * 2 * _sc_y * _syp
+                                    elif _et == "ell":
+                                        _rx = _el["x"]*_sxp; _ry = _el["y"]*_syp
+                                        _rw = _el["w"]*_sxp; _rh = _el["h"]*_syp
                                         _pg_sv.draw_oval(
-                                            fitz.Rect(_left, _top, _left+_w2, _top+_h2),
-                                            color=_s_clr, fill=_f_clr, width=_lw
+                                            fitz.Rect(_rx,_ry,_rx+_rw,_ry+_rh),
+                                            color=_sc, fill=_fc, width=_lw
                                         )
-                                    elif _otype == "line":
-                                        _bw = _obj.get("width", 0)
-                                        _bh = _obj.get("height", 0)
-                                        _cx = _left + _bw * _sxp / 2
-                                        _cy = _top  + _bh * _syp / 2
-                                        _p1 = fitz.Point(
-                                            _cx + _obj.get("x1", 0) * _sxp,
-                                            _cy + _obj.get("y1", 0) * _syp
+                                    elif _et == "line":
+                                        _pg_sv.draw_line(
+                                            fitz.Point(_el["x1"]*_sxp, _el["y1"]*_syp),
+                                            fitz.Point(_el["x2"]*_sxp, _el["y2"]*_syp),
+                                            color=_sc, width=_lw
                                         )
-                                        _p2 = fitz.Point(
-                                            _cx + _obj.get("x2", 0) * _sxp,
-                                            _cy + _obj.get("y2", 0) * _syp
+                                    elif _et == "text":
+                                        _fmap = {"Helvetica":"helv","Times":"tiro","Courier":"cour"}
+                                        _tc   = _parse_fabric_color(_el.get("tc","#000000"))
+                                        _pg_sv.insert_text(
+                                            fitz.Point(_el["x"]*_sxp, _el["y"]*_syp),
+                                            _el.get("txt",""),
+                                            fontname=_fmap.get(_el.get("ff","Helvetica"),"helv"),
+                                            fontsize=max(4, _el.get("fs",14)*_sxp),
+                                            color=_tc or (0,0,0)
                                         )
-                                        _pg_sv.draw_line(_p1, _p2, color=_s_clr, width=_lw)
-                                    elif _otype == "path":
-                                        _pts = _extract_path_pts(_obj, _sxp, _syp)
-                                        if len(_pts) >= 2:
-                                            _pg_sv.draw_polyline(_pts, color=_s_clr, width=_lw)
-
-                            # Aplicar textos
-                            for _te in st.session_state.ed_text_elems:
-                                _pg_sv2 = _doc_sv[_te["page"]]
-                                _tc = _te["color"]
-                                _pg_sv2.insert_text(
-                                    fitz.Point(_te["x"], _te["y"]),
-                                    _te["text"], fontname=_te["fontname"],
-                                    fontsize=_te["fontsize"],
-                                    color=(int(_tc[1:3],16)/255,
-                                           int(_tc[3:5],16)/255,
-                                           int(_tc[5:7],16)/255)
-                                )
-
                             _buf_sv = BytesIO()
                             _doc_sv.save(_buf_sv)
                             _doc_sv.close()
                             _buf_sv.seek(0)
                             st.session_state.ed_result = _buf_sv.getvalue()
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {e}")
+                        except Exception as _e:
+                            st.error(f"Error: {_e}")
 
                 if st.session_state.ed_result:
                     st.download_button(
-                        label="⬇️ Descargar PDF editado",
+                        label="Descargar PDF editado",
                         data=st.session_state.ed_result,
-                        file_name=ed_file.name.replace(".pdf", "_editado.pdf"),
+                        file_name=ed_file.name.replace(".pdf","_editado.pdf"),
                         mime="application/pdf",
                         type="primary",
                         use_container_width=True
                     )
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🔄 Nueva edición", use_container_width=True, key="ed_rst3"):
-                        st.session_state.ed_text_elems = []
-                        st.session_state.ed_result     = None
-                        st.session_state.ed_cur_page   = 0
-                        for _pi in range(n_pages_ed):
-                            _ck = f"ed_canvas_{_pi}"
-                            if _ck in st.session_state:
-                                del st.session_state[_ck]
+                    if st.button("Reiniciar edicion", use_container_width=True, key="ed_rst"):
+                        st.session_state.ed_canvas_data = {}
+                        st.session_state.ed_result      = None
+                        st.session_state.ed_cur_page    = 0
                         st.rerun()
+
+                # ── Receptor de datos del canvas ─────────────────────────────
+                st.markdown("---")
+                _raw_json = st.text_area(
+                    "NEXA_CANVAS_DATA",
+                    key="ed_raw_json",
+                    height=50,
+                    label_visibility="collapsed",
+                    placeholder="(datos del canvas)"
+                )
+                if _raw_json and _raw_json.strip().startswith("{"):
+                    try:
+                        _cdata    = _json.loads(_raw_json.strip())
+                        _page_els = _cdata.get("elements", [])
+                        st.session_state.ed_canvas_data[cur_page] = _page_els
+                    except Exception:
+                        pass
+                    st.session_state["ed_raw_json"] = ""
+                    st.rerun()
 
             # ── Canvas principal (columna central) ─────────────────────────
             with canvas_col:
-                _dm2 = st.session_state.ed_draw_mode
-                # En modo texto, el canvas está en "transform" (sólo mover existentes)
-                _canvas_mode = "transform" if _dm2 == "text" else _dm2
-
-                # Calcular fill RGBA para el canvas
-                if _dm2 in ("rect", "circle") and st.session_state.ed_has_fill:
-                    _fh = st.session_state.ed_fill_hex
-                    _fr_v, _fg_v, _fb_v = int(_fh[1:3],16), int(_fh[3:5],16), int(_fh[5:7],16)
-                    _fill_str = f"rgba({_fr_v},{_fg_v},{_fb_v},0.3)"
-                else:
-                    _fill_str = "rgba(0,0,0,0)"
-
-                _stroke_str = (st.session_state.ed_stroke_c
-                               if _dm2 not in ("text", "transform") else "#1B9FD8")
-                _sw_val     = (st.session_state.ed_stroke_w
-                               if _dm2 not in ("text", "transform") else 1)
-
-                _canvas_res = _st_canvas(
-                    fill_color=_fill_str,
-                    stroke_width=_sw_val,
-                    stroke_color=_stroke_str,
-                    background_image=_bg_pil,
-                    update_streamlit=True,
-                    height=canvas_h,
-                    width=CANVAS_W,
-                    drawing_mode=_canvas_mode,
-                    point_display_radius=0,
-                    display_toolbar=False,
-                    key=f"ed_canvas_{cur_page}",
-                )
-
-                # Guardar estado del canvas en session_state (para acceso entre páginas)
-                if _canvas_res is not None and _canvas_res.json_data is not None:
-                    st.session_state[f"ed_canvas_{cur_page}"] = _canvas_res.json_data
-
-                # Tip contextual
-                _ed_tips = {
-                    "rect":      "💡 Clic y arrastra para dibujar un rectángulo",
-                    "circle":    "💡 Clic y arrastra para dibujar una elipse",
-                    "freedraw":  "💡 Dibuja trazos libres directamente sobre el PDF",
-                    "line":      "💡 Clic y arrastra para trazar una línea",
-                    "transform": "💡 Clic para seleccionar · arrastra para mover · handles para redimensionar",
-                    "text":      "💡 Configura el texto en el panel derecho y pulsa ➕ Agregar texto",
-                }
-                st.caption(_ed_tips.get(_dm2, ""))
+                st.components.v1.html(_canvas_html, height=canvas_h + 80, scrolling=False)
 
 
 # ==========================================

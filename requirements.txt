@@ -3,5 +3,3 @@ pandas
 PyPDF2
 openpyxl
 PyMuPDF
-streamlit-drawable-canvas
-Pillow
