@@ -10,6 +10,13 @@ from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from io import BytesIO
 
 # ══════════════════════════════════════════════════════
+#  ANTHROPIC API CONFIG
+# ══════════════════════════════════════════════════════
+import os
+if hasattr(st, 'secrets') and 'ANTHROPIC_API_KEY' in st.secrets:
+    os.environ['ANTHROPIC_API_KEY'] = st.secrets['ANTHROPIC_API_KEY']
+
+# ══════════════════════════════════════════════════════
 #  CONFIG
 # ══════════════════════════════════════════════════════
 st.set_page_config(
@@ -1575,6 +1582,103 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════
+#  FUNCIONES VALIDADOR IA
+# ══════════════════════════════════════════════════════
+def extraer_texto_pdf(archivo_bytes):
+    try:
+        import fitz
+        doc = fitz.open(stream=archivo_bytes, filetype="pdf")
+        texto_completo = ""
+        paginas = []
+        for i, page in enumerate(doc):
+            texto_pagina = page.get_text()
+            texto_completo += f"\n--- PÁGINA {i+1} ---\n{texto_pagina}"
+            paginas.append({"pagina": i+1, "texto": texto_pagina})
+        n = len(doc)
+        doc.close()
+        return texto_completo, paginas, n
+    except Exception as e:
+        return "", [], 0
+
+def validar_con_ia(texto_pdf, tipo_tramite, criterios_extra=""):
+    import anthropic
+    import json
+    
+    prompts = {
+        "Desembolso Subsidio Colsubsidio": f"""Eres experto validador de documentos de desembolso de subsidios de vivienda en Colombia para Colsubsidio.
+Analiza el texto del expediente y verifica CADA criterio:
+
+1. CERTIFICADO DE TRADICIÓN Y LIBERTAD (CTL):
+   - ¿Fecha de expedición menor a 30 días?
+   - ¿Vigencia del subsidio POSTERIOR a fecha de firma de escritura?
+   - ¿Especifica que es vivienda VIS?
+   - ¿Número de matrícula inmobiliaria presente?
+
+2. ACTA DE ENTREGA:
+   - ¿Fecha del acta POSTERIOR o igual a fecha de suscripción de escritura?
+   - ¿Firmada por todas las partes?
+
+3. AUTORIZACIÓN DE DESEMBOLSO:
+   - ¿Valor del subsidio coincide con la escritura pública?
+   - ¿Firmada por todos los beneficiarios mayores de edad?
+
+4. ESCRITURA PÚBLICA:
+   - ¿Valor de compraventa consistente con autorización de desembolso?
+   - ¿Especifica que es VIS?
+
+5. CERTIFICADO DE EXISTENCIA DE LA VIVIENDA:
+   - ¿Está presente?
+
+CRITERIOS ADICIONALES: {criterios_extra}
+
+Responde SOLO con JSON válido, sin texto adicional, sin backticks:
+{{{{
+  "score": <0-100>,
+  "resultado_general": "<APROBADO|REQUIERE_REVISION|RECHAZADO>",
+  "resumen": "<frase explicando resultado>",
+  "hallazgos": [
+    {{{{
+      "criterio": "<nombre>",
+      "documento": "<documento revisado>",
+      "estado": "<CUMPLE|NO_CUMPLE|NO_ENCONTRADO|ADVERTENCIA>",
+      "severidad": "<CRITICO|MEDIO|BAJO|OK>",
+      "observacion": "<hallazgo específico>",
+      "pagina_estimada": <número o null>
+    }}}}
+  ],
+  "documentos_faltantes": ["<lista>"],
+  "recomendaciones": ["<lista de acciones>"]
+}}}}""",
+        "Desembolso Caja Compensación": f"""Eres experto validador de documentos de desembolso de subsidios de vivienda en Colombia.
+Verifica: CTL vigencia max 30 días, acta entrega posterior a escritura, valor subsidio consistente, firmas beneficiarios, certificado existencia vivienda.
+CRITERIOS ADICIONALES: {criterios_extra}
+Responde SOLO con JSON válido sin backticks con la misma estructura definida.""",
+        "Personalizado": f"""Eres experto validador de documentos de radicación en Colombia.
+Valida el expediente según estos criterios: {criterios_extra}
+Responde SOLO con JSON válido sin backticks:
+{{"score":0,"resultado_general":"REQUIERE_REVISION","resumen":"","hallazgos":[],"documentos_faltantes":[],"recomendaciones":[]}}"""
+    }
+    
+    prompt = prompts.get(tipo_tramite, prompts["Personalizado"])
+    client = anthropic.Anthropic()
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=4000,
+        messages=[{"role": "user", "content": f"{prompt}\n\nTEXTO DEL EXPEDIENTE:\n{texto_pdf[:15000]}"}]
+    )
+    respuesta = message.content[0].text.strip()
+    if "```" in respuesta:
+        partes = respuesta.split("```")
+        for parte in partes:
+            parte = parte.strip()
+            if parte.startswith("json"):
+                parte = parte[4:].strip()
+            if parte.startswith("{"):
+                respuesta = parte
+                break
+    return json.loads(respuesta)
+
+# ══════════════════════════════════════════════════════
 #  TABS PRINCIPALES
 # ══════════════════════════════════════════════════════
 tabs = st.tabs([
@@ -1585,6 +1689,7 @@ tabs = st.tabs([
     "🔗 Merge PDF",
     "✏️ Editar PDF",
     "🗑️ Eliminar Páginas",
+    "🤖 Validador IA",
 ])
 
 # ══════════════════════════════════════════════════════
@@ -2832,3 +2937,143 @@ with tabs[6]:
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error: {e}")
+
+# ══════════════════════════════════════════════════════
+#  TAB 7 — VALIDADOR IA
+# ══════════════════════════════════════════════════════
+with tabs[7]:
+
+    st.markdown("""
+    <div class="nx-page-header">
+      <div class="nx-page-title">🤖 Validador <span style="color:#00C2CB">Inteligente</span> de Documentos</div>
+      <div class="nx-page-sub">Valida automáticamente si tu expediente cumple los requisitos antes de radicar. <strong>Reduce devoluciones a cero.</strong></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_conf, col_upload = st.columns([1, 1], gap="large")
+
+    with col_conf:
+        st.markdown('<div class="nx-section">⚙️ Configuración</div>', unsafe_allow_html=True)
+        tipo_tramite = st.selectbox("Tipo de trámite", ["Desembolso Subsidio Colsubsidio", "Desembolso Caja Compensación", "Personalizado"])
+        entidad = st.text_input("Entidad receptora", placeholder="Ej: Colsubsidio, Comfama...")
+        criterios_extra = st.text_area("Criterios adicionales (opcional)", placeholder="Agrega criterios específicos de validación...", height=140)
+
+    with col_upload:
+        st.markdown('<div class="nx-section">📄 Expediente</div>', unsafe_allow_html=True)
+        archivo_pdf = st.file_uploader("Sube el expediente PDF completo", type=["pdf"], key="validador_ia_uploader")
+        if archivo_pdf:
+            st.success(f"✅ {archivo_pdf.name} cargado")
+            pdf_bytes = archivo_pdf.read()
+            texto_pdf, paginas_pdf, num_paginas = extraer_texto_pdf(pdf_bytes)
+            st.info(f"📄 {num_paginas} páginas listas para análisis")
+
+    st.markdown("---")
+    col_b1, col_b2, col_b3 = st.columns([1,2,1])
+    with col_b2:
+        btn_validar = st.button("🤖 Ejecutar Validación IA", type="primary", use_container_width=True, disabled=not archivo_pdf if 'archivo_pdf' in dir() else True)
+
+    if 'btn_validar' in dir() and btn_validar and archivo_pdf:
+        if not texto_pdf:
+            st.error("❌ No se pudo extraer texto del PDF.")
+        else:
+            with st.spinner("🔍 Analizando expediente con IA... 20-30 segundos"):
+                try:
+                    resultado = validar_con_ia(texto_pdf, tipo_tramite, criterios_extra)
+                    st.session_state["ultimo_resultado"] = resultado
+                    st.session_state["ultimo_archivo"] = archivo_pdf.name
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    resultado = None
+
+            if resultado:
+                score = resultado.get("score", 0)
+                res_general = resultado.get("resultado_general", "REQUIERE_REVISION")
+                resumen = resultado.get("resumen", "")
+                colores = {"APROBADO":"#00C48C","REQUIERE_REVISION":"#F5A623","RECHAZADO":"#F04747"}
+                emojis = {"APROBADO":"✅","REQUIERE_REVISION":"⚠️","RECHAZADO":"❌"}
+                color = colores.get(res_general, "#F5A623")
+                emoji = emojis.get(res_general, "⚠️")
+
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,#0A0F1E,#1A2234);border-radius:16px;padding:28px;margin:16px 0;text-align:center;border:1px solid rgba(0,194,203,0.2);">
+                    <div style="font-size:48px;margin-bottom:8px;">{emoji}</div>
+                    <div style="font-size:26px;font-weight:800;color:{color};margin-bottom:6px;">{res_general.replace('_',' ')}</div>
+                    <div style="font-size:44px;font-weight:800;color:#fff;line-height:1;">{score}<span style="font-size:20px;color:rgba(255,255,255,0.4)">/100</span></div>
+                    <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-top:8px;">{resumen}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                hallazgos = resultado.get("hallazgos", [])
+                if hallazgos:
+                    st.markdown('<div class="nx-section">🔍 Hallazgos</div>', unsafe_allow_html=True)
+                    c1,c2,c3,c4 = st.columns(4)
+                    c1.metric("🔴 Críticos", len([h for h in hallazgos if h.get("severidad")=="CRITICO"]))
+                    c2.metric("🟡 Medios", len([h for h in hallazgos if h.get("severidad")=="MEDIO"]))
+                    c3.metric("🔵 Bajos", len([h for h in hallazgos if h.get("severidad")=="BAJO"]))
+                    c4.metric("✅ OK", len([h for h in hallazgos if h.get("severidad")=="OK"]))
+
+                    for h in hallazgos:
+                        sev = h.get("severidad","BAJO")
+                        col_sev = {"CRITICO":"#F04747","MEDIO":"#F5A623","BAJO":"#1B6FE8","OK":"#00C48C"}.get(sev,"#8494A8")
+                        em = {"CUMPLE":"✅","NO_CUMPLE":"❌","NO_ENCONTRADO":"❓","ADVERTENCIA":"⚠️"}.get(h.get("estado",""),"❓")
+                        pag = f" · Pág. {h.get('pagina_estimada')}" if h.get("pagina_estimada") else ""
+                        st.markdown(f"""
+                        <div style="background:#fff;border:1px solid rgba(10,15,30,0.08);border-left:4px solid {col_sev};border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                                <div style="flex:1;">
+                                    <div style="font-size:13px;font-weight:700;color:#0A0F1E;margin-bottom:2px;">{em} {h.get('criterio','')}</div>
+                                    <div style="font-size:11px;color:#8494A8;margin-bottom:5px;">📄 {h.get('documento','')}{pag}</div>
+                                    <div style="font-size:12px;color:#556070;line-height:1.5;">{h.get('observacion','')}</div>
+                                </div>
+                                <div style="background:{col_sev};color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;">{sev}</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                faltantes = resultado.get("documentos_faltantes", [])
+                if faltantes:
+                    st.markdown('<div class="nx-section">📋 Documentos faltantes</div>', unsafe_allow_html=True)
+                    for d in faltantes:
+                        st.markdown(f'<div style="background:rgba(240,71,71,0.05);border:1px solid rgba(240,71,71,0.2);border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px;color:#F04747;">❌ {d}</div>', unsafe_allow_html=True)
+
+                recomendaciones = resultado.get("recomendaciones", [])
+                if recomendaciones:
+                    st.markdown('<div class="nx-section">💡 Acciones antes de radicar</div>', unsafe_allow_html=True)
+                    for i, r in enumerate(recomendaciones, 1):
+                        st.markdown(f'<div style="background:rgba(0,194,203,0.04);border:1px solid rgba(0,194,203,0.15);border-radius:8px;padding:10px 14px;margin-bottom:6px;font-size:13px;color:#0A0F1E;"><strong style="color:#00A8B0">{i}.</strong> {r}</div>', unsafe_allow_html=True)
+
+                st.markdown("---")
+                import json as json_lib
+                reporte = f"""REPORTE VALIDACIÓN NEXA
+{'='*50}
+Archivo: {archivo_pdf.name}
+Trámite: {tipo_tramite}
+Entidad: {entidad or 'No especificada'}
+Resultado: {res_general}
+Score: {score}/100
+Resumen: {resumen}
+
+HALLAZGOS:
+{chr(10).join([f"- [{h.get('severidad')}] {h.get('criterio')}: {h.get('observacion')}" for h in hallazgos])}
+
+FALTANTES:
+{chr(10).join([f"- {d}" for d in faltantes]) if faltantes else "Ninguno"}
+
+RECOMENDACIONES:
+{chr(10).join([f"{i+1}. {r}" for i, r in enumerate(recomendaciones)])}"""
+
+                cd1, cd2 = st.columns(2)
+                with cd1:
+                    st.download_button("📄 Descargar reporte TXT", data=reporte, file_name=f"validacion_{archivo_pdf.name.replace('.pdf','')}.txt", mime="text/plain", use_container_width=True)
+                with cd2:
+                    st.download_button("📊 Descargar reporte JSON", data=json_lib.dumps(resultado, ensure_ascii=False, indent=2), file_name=f"validacion_{archivo_pdf.name.replace('.pdf','')}.json", mime="application/json", use_container_width=True)
+
+    elif not archivo_pdf if 'archivo_pdf' in dir() else True:
+        st.markdown("""
+        <div class="nx-empty">
+            <div class="nx-empty-icon">🤖</div>
+            <div class="nx-empty-text">Sube un expediente PDF para comenzar</div>
+            <div class="nx-empty-sub">El Validador IA analizará cada documento y te dirá exactamente qué corregir antes de radicar</div>
+        </div>
+        """, unsafe_allow_html=True)
+
