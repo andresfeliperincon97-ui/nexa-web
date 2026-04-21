@@ -13,8 +13,27 @@ from io import BytesIO
 #  ANTHROPIC API CONFIG
 # ══════════════════════════════════════════════════════
 import os
-if hasattr(st, 'secrets') and 'ANTHROPIC_API_KEY' in st.secrets:
-    os.environ['ANTHROPIC_API_KEY'] = st.secrets['ANTHROPIC_API_KEY']
+import anthropic
+
+# Leer API key desde múltiples fuentes posibles
+def get_anthropic_client():
+    api_key = None
+    
+    # Intentar desde st.secrets
+    try:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    except:
+        pass
+    
+    # Intentar desde variable de entorno
+    if not api_key:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+    
+    if not api_key:
+        st.error("❌ ANTHROPIC_API_KEY no encontrada en secrets ni variables de entorno")
+        return None
+    
+    return anthropic.Anthropic(api_key=api_key)
 
 # ══════════════════════════════════════════════════════
 #  CONFIG
@@ -1660,7 +1679,9 @@ Responde SOLO con JSON válido sin backticks:
     }
     
     prompt = prompts.get(tipo_tramite, prompts["Personalizado"])
-    client = anthropic.Anthropic()
+    client = get_anthropic_client()
+    if not client:
+        raise Exception("No se pudo inicializar el cliente de Anthropic")
     message = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=4000,
